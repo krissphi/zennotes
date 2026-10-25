@@ -1,0 +1,106 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    --bg-main: #FFFFFF;
+    --bg-sidebar: #F8FAFC;
+    --bg-surface: #FFFFFF;
+    --text-main: #0F172A;
+    --text-muted: #64748B;
+    --border-subtle: #E2E8F0;
+    --guide-line: #CBD5E1;
+    --accent: #059669;
+    --accent-hover: #047857;
+  }
+
+  .dark {
+    --bg-main: #09090B;
+    --bg-sidebar: #111113;
+    --bg-surface: #18181B;
+    --text-main: #F8FAFC;
+    --text-muted: #94A3B8;
+    --border-subtle: #27272A;
+    --guide-line: #334155;
+    --accent: #10B981;
+    --accent-hover: #34D399;
+  }
+
+  html, body, #root {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    background-color: var(--bg-main);
+    color: var(--text-main);
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  /* Stabilize scrollbar so layout does not shift when branches expand */
+  .overflow-y-auto {
+    scrollbar-gutter: stable;
+  }
+
+  /* Instant textarea auto-sizing without reflow jitter */
+  textarea {
+    field-sizing: content;
+  }
+}
+
+/* Custom theme-aware scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 9999px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* Clean, Ink-Friendly Print & PDF Export Formatting */
+@media print {
+  html, body, #root, div {
+    height: auto !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  header, aside, .fixed, nav, button, [role="dialog"] {
+    display: none !important;
+  }
+
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+  }
+
+  textarea {
+    color: #000000 !important;
+    border: none !important;
+    background: transparent !important;
+  }
+}

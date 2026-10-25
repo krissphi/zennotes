@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>ZenNotes — Infinite Tree Outliner & Note Taking Workspace</title>
+
+    <!-- SEO Primary Meta Tags -->
+    <meta name="title" content="ZenNotes — Infinite Tree Outliner & Note Taking Workspace" />
+    <meta name="description" content="Structure complex thoughts with infinite depth. A fast, local-first outliner engineered for recursive tree thinking, bullet zoom focus, and 100% offline privacy." />
+    <meta name="keywords" content="outliner, tree notes, hierarchical note taking, workflowy alternative, mind map outliner, markdown outliner, personal knowledge management, local first notes, pwa outliner" />
+    <meta name="author" content="ZenNotes" />
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+    <link rel="canonical" href="https://zennotes.app/" />
+
+    <!-- Open Graph / Facebook / LinkedIn / WhatsApp -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://zennotes.app/" />
+    <meta property="og:site_name" content="ZenNotes" />
+    <meta property="og:title" content="ZenNotes — Infinite Tree Outliner" />
+    <meta property="og:description" content="Structure complex thoughts with infinite depth. Fast, local-first, distraction-free hierarchical note taking." />
+    <meta property="og:image" content="https://zennotes.app/favicon.svg" />
+    <meta property="og:image:alt" content="ZenNotes Logo" />
+
+    <!-- Twitter Cards -->
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:url" content="https://zennotes.app/" />
+    <meta name="twitter:title" content="ZenNotes — Infinite Tree Outliner" />
+    <meta name="twitter:description" content="Structure complex thoughts with infinite depth. Fast, local-first, distraction-free hierarchical note taking." />
+    <meta name="twitter:image" content="https://zennotes.app/favicon.svg" />
+
+    <!-- PWA & Mobile Web App Meta -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#059669" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="ZenNotes" />
+    <meta name="application-name" content="ZenNotes" />
+    <meta name="format-detection" content="telephone=no" />
+
+    <!-- Structured Data (JSON-LD) for Search Engines -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "ZenNotes",
+        "url": "https://zennotes.app/",
+        "operatingSystem": "All",
+        "applicationCategory": "ProductivityApplication",
+        "description": "Infinite hierarchical tree outliner and distraction-free note taking workspace with bullet zoom and offline privacy.",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "featureList": [
+          "Infinite nested hierarchical tree outlining",
+          "Bullet zoom and hoist focus",
+          "IndexedDB offline local-first storage",
+          "7-day automatic recycle bin retention",
+          "Universal Markdown and JSON export"
+        ]
+      }
+    </script>
+
+    <!-- Preconnect Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Anti-flicker Theme Script -->
+    <script>
+      (function() {
+        try {
+          const saved = localStorage.getItem('zennotes_theme_mode');
+          if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body class="bg-white dark:bg-[#09090B] text-[#0F172A] dark:text-[#F8FAFC] antialiased selection:bg-emerald-100 dark:selection:bg-emerald-950">
+    <noscript>
+      <div style="padding: 2rem; font-family: sans-serif; text-align: center;">
+        <h1>ZenNotes — Infinite Tree Outliner</h1>
+        <p>A fast, local-first outliner engineered for recursive tree thinking, bullet zoom focus, and offline privacy.</p>
+        <p>Please enable JavaScript in your browser to launch the full interactive workspace.</p>
+      </div>
+    </noscript>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
