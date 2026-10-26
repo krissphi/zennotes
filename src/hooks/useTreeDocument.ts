@@ -18,11 +18,27 @@ export function useTreeDocument(notebookId = 'default') {
   const [trashItems, setTrashItems] = useState<TrashItem[]>([])
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const pendingDocRef = useRef<TreeDocument | null>(null)
+  const historyTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const pendingHistoryStateRef = useRef<TreeDocument | null>(null)
 
   const history = useDocumentHistory()
+  const { pushState, resetHistory } = history
+
+  // Flush pending history recording immediately
+  const flushHistory = useCallback(() => {
+    if (historyTimeoutRef.current) {
+      clearTimeout(historyTimeoutRef.current)
+      historyTimeoutRef.current = null
+    }
+    if (pendingHistoryStateRef.current) {
+      pushState(pendingHistoryStateRef.current.toJSON())
+      pendingHistoryStateRef.current = null
+    }
+  }, [pushState])
 
   // Flush pending save immediately
   const flushSave = useCallback(async () => {
+    flushHistory()
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current)
       saveTimeoutRef.current = null
@@ -37,7 +53,13 @@ export function useTreeDocument(notebookId = 'default') {
       console.error('Save failed:', e)
       setSaveStatus('error')
     }
-  }, [])
+  }, [flushHistory])
+
+  // Stable ref for flushSave to prevent infinite render loops in effects
+  const flushSaveRef = useRef(flushSave)
+  useEffect(() => {
+    flushSaveRef.current = flushSave
+  })
 
   // Auto-save with debounce
   const triggerAutoSave = useCallback((newDoc: TreeDocument) => {
@@ -49,9 +71,9 @@ export function useTreeDocument(notebookId = 'default') {
 
   // Life-cycle listeners
   useEffect(() => {
-    const handleBeforeUnload = () => { flushSave() }
+    const handleBeforeUnload = () => { flushSaveRef.current() }
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') flushSave()
+      if (document.visibilityState === 'hidden') flushSaveRef.current()
     }
     window.addEventListener('beforeunload', handleBeforeUnload)
     document.addEventListener('visibilitychange', handleVisibilityChange)
@@ -59,82 +81,105 @@ export function useTreeDocument(notebookId = 'default') {
       window.removeEventListener('beforeunload', handleBeforeUnload)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [flushSave])
+  }, [])
 
-  // Load from IndexedDB on notebookId change
+  // Load from IndexedDB on notebookId change ONLY
   useEffect(() => {
+    let isCancelled = false
     async function loadData() {
-      await flushSave()
+      await flushSaveRef.current()
       setIsLoaded(false)
       const storageKey = NotebookRegistryService.getStorageKey(notebookId)
       storage.setStorageKey(storageKey)
       try {
         const loadedData = await storage.loadDocument()
+        if (isCancelled) return
         if (loadedData) {
           const loadedDoc = TreeDocument.fromJSON(loadedData)
           setDoc(loadedDoc)
           setFocusedNodeId(loadedDoc.rootId)
-          history.resetHistory(loadedData)
+          resetHistory(loadedData)
         } else {
           const freshDoc = TreeDocument.createDefault()
           setDoc(freshDoc)
           setFocusedNodeId(freshDoc.rootId)
-          history.resetHistory(freshDoc.toJSON())
+          resetHistory(freshDoc.toJSON())
         }
         const loadedTrash = await TrashStorageService.loadTrash(notebookId)
+        if (isCancelled) return
         setTrashItems(loadedTrash)
       } catch (err) {
         console.error('Error loading data:', err)
       } finally {
-        setIsLoaded(true)
+        if (!isCancelled) setIsLoaded(true)
       }
     }
     loadData()
+    return () => {
+      isCancelled = true
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notebookId, flushSave])
+  }, [notebookId])
 
   const mutateDoc = useCallback(
-    (mutator: (cloned: TreeDocument) => void, newActiveId?: string | null) => {
+    (
+      mutator: (cloned: TreeDocument) => void,
+      newActiveId?: string | null,
+      isTextEdit = false
+    ) => {
       setDoc((prev) => {
         const cloned = prev.clone()
         mutator(cloned)
-        history.pushState(cloned.toJSON())
+
+        if (isTextEdit) {
+          pendingHistoryStateRef.current = cloned
+          if (historyTimeoutRef.current) clearTimeout(historyTimeoutRef.current)
+          historyTimeoutRef.current = setTimeout(() => {
+            flushHistory()
+          }, 800)
+        } else {
+          flushHistory()
+          pushState(cloned.toJSON())
+        }
+
         triggerAutoSave(cloned)
         return cloned
       })
       if (newActiveId !== undefined) setActiveEditingId(newActiveId)
     },
-    [triggerAutoSave, history]
+    [triggerAutoSave, pushState, flushHistory]
   )
 
   const undo = useCallback(() => {
+    flushHistory()
     const prevState = history.undo()
     if (prevState) {
       const restored = TreeDocument.fromJSON(prevState)
       setDoc(restored)
       triggerAutoSave(restored)
     }
-  }, [history, triggerAutoSave])
+  }, [flushHistory, history, triggerAutoSave])
 
   const redo = useCallback(() => {
+    flushHistory()
     const nextState = history.redo()
     if (nextState) {
       const restored = TreeDocument.fromJSON(nextState)
       setDoc(restored)
       triggerAutoSave(restored)
     }
-  }, [history, triggerAutoSave])
+  }, [flushHistory, history, triggerAutoSave])
 
   const updateTitle = useCallback((title: string) => {
-    mutateDoc((cloned) => { cloned.title = title })
+    mutateDoc((cloned) => { cloned.title = title }, undefined, true)
   }, [mutateDoc])
 
   const updateContent = useCallback((nodeId: string, content: string) => {
-    mutateDoc((cloned) => { cloned.getNode(nodeId)?.setContent(content) })
+    mutateDoc((cloned) => { cloned.getNode(nodeId)?.setContent(content) }, undefined, true)
   }, [mutateDoc])
 
   const updateNote = useCallback((nodeId: string, note: string) => {
-    mutateDoc((cloned) => { cloned.getNode(nodeId)?.setNote(note) })
+    mutateDoc((cloned) => { cloned.getNode(nodeId)?.setNote(note) }, undefined, true)
   }, [mutateDoc])
 
   const addSibling = useCallback((refId: string) => {

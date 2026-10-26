@@ -1,10 +1,12 @@
 import React from 'react'
-import { ExternalLink, Tag } from 'lucide-react'
+import { ExternalLink, Tag, Link2 } from 'lucide-react'
+import { CodeBlock } from './CodeBlock'
 
 interface FormattedNodeTextProps {
   content: string
   isCompleted: boolean
   onActivate: () => void
+  onNavigateToWikilink?: (title: string) => void
 }
 
 function getTagStyle(tag: string): string {
@@ -28,8 +30,10 @@ export const FormattedNodeText: React.FC<FormattedNodeTextProps> = ({
   content,
   isCompleted,
   onActivate,
+  onNavigateToWikilink,
 }) => {
-  if (!content.trim()) {
+  const trimmed = content.trim()
+  if (!trimmed) {
     return (
       <div
         onClick={onActivate}
@@ -40,8 +44,43 @@ export const FormattedNodeText: React.FC<FormattedNodeTextProps> = ({
     )
   }
 
-  // Regex to match URLs or Hashtags: (https?://\S+) | (#[a-zA-Z0-9_-]+)
-  const regex = /(https?:\/\/[^\s]+)|(#[a-zA-Z0-9_-]+)/g
+  // 1. Full Fenced Code Block Detection (```lang ... ``` or ``` ...)
+  if (trimmed.startsWith('```')) {
+    const raw = trimmed
+    const firstLineEnd = raw.indexOf('\n')
+    let language = 'code'
+    let code = ''
+
+    if (firstLineEnd !== -1) {
+      language = raw.substring(3, firstLineEnd).trim() || 'code'
+      let body = raw.substring(firstLineEnd + 1)
+      if (body.endsWith('```')) {
+        body = body.substring(0, body.length - 3).trimEnd()
+      }
+      code = body
+    } else {
+      // Single line ```code``` or ```lang code```
+      const rest = raw.substring(3)
+      code = rest.endsWith('```') ? rest.substring(0, rest.length - 3).trim() : rest.trim()
+      // If starts with lang word like `js console.log(1)`
+      const spaceIdx = code.indexOf(' ')
+      if (spaceIdx !== -1 && !code.substring(0, spaceIdx).includes('(')) {
+        language = code.substring(0, spaceIdx)
+        code = code.substring(spaceIdx + 1)
+      }
+    }
+
+    return (
+      <CodeBlock
+        code={code}
+        language={language}
+        onActivate={onActivate}
+      />
+    )
+  }
+
+  // 2. Rich Text with URLs, Hashtags, Inline Code (`...`), and Wikilinks ([[...]])
+  const regex = /(https?:\/\/[^\s]+)|(#[a-zA-Z0-9_-]+)|(`[^`\n]+`)|(\[\[([^\]\n]+)\]\])/g
   const parts: React.ReactNode[] = []
   let lastIndex = 0
   let match: RegExpExecArray | null
@@ -52,6 +91,7 @@ export const FormattedNodeText: React.FC<FormattedNodeTextProps> = ({
     }
 
     if (match[1]) {
+      // URL Linkify
       const url = match[1]
       parts.push(
         <a
@@ -67,6 +107,7 @@ export const FormattedNodeText: React.FC<FormattedNodeTextProps> = ({
         </a>
       )
     } else if (match[2]) {
+      // Tag Badge
       const tag = match[2]
       parts.push(
         <span
@@ -76,6 +117,35 @@ export const FormattedNodeText: React.FC<FormattedNodeTextProps> = ({
           <Tag className="w-2.5 h-2.5 opacity-60 shrink-0" />
           <span>{tag}</span>
         </span>
+      )
+    } else if (match[3]) {
+      // Inline Code Snippet
+      const inlineCode = match[3].slice(1, -1)
+      parts.push(
+        <code
+          key={`code-${match.index}`}
+          className="inline-flex items-center px-1.5 py-0.5 mx-0.5 font-mono text-[12px] rounded-md bg-slate-100 dark:bg-zinc-800 text-emerald-600 dark:text-emerald-400 border border-slate-200/80 dark:border-zinc-700/80 font-medium select-text"
+        >
+          {inlineCode}
+        </code>
+      )
+    } else if (match[4]) {
+      // Wikilink / Internal Reference ([[Note Title]])
+      const linkTarget = match[5]
+      parts.push(
+        <button
+          type="button"
+          key={`wikilink-${match.index}`}
+          onClick={(e) => {
+            e.stopPropagation()
+            onNavigateToWikilink?.(linkTarget)
+          }}
+          title={`Jump to "${linkTarget}"`}
+          className="inline-flex items-center gap-1 px-1.5 py-0.2 mx-0.5 font-medium text-[11px] rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300/80 dark:border-emerald-700/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors cursor-pointer select-none"
+        >
+          <Link2 className="w-2.5 h-2.5 shrink-0 opacity-80" />
+          <span>{linkTarget}</span>
+        </button>
       )
     }
 

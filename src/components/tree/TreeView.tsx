@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useMemo, useCallback } from 'react'
 import { Plus } from 'lucide-react'
 import { TreeNodeItem } from './TreeNodeItem'
 import { BranchHeader } from './BranchHeader'
@@ -22,6 +22,7 @@ interface TreeViewProps {
   onZoomIn: (id: string) => void
   onZoomOut?: () => void
   onSetActiveId: (id: string) => void
+  onNavigateToWikilink?: (title: string) => void
 }
 
 export const TreeView: React.FC<TreeViewProps> = ({
@@ -42,10 +43,41 @@ export const TreeView: React.FC<TreeViewProps> = ({
   onZoomIn,
   onZoomOut,
   onSetActiveId,
+  onNavigateToWikilink,
 }) => {
   const focusedNode = doc.getNode(focusedNodeId) || doc.getRootNode()
   const isRoot = focusedNode.id === doc.rootId
   const childrenIds = focusedNode.childrenIds
+
+  // Compute all currently visible (uncollapsed) node IDs in top-to-bottom order for arrow-key navigation
+  const visibleNodeIds = useMemo(() => {
+    const list: string[] = []
+    const traverse = (nodeId: string) => {
+      const node = doc.getNode(nodeId)
+      if (!node) return
+      list.push(nodeId)
+      if (!node.isCollapsed && node.childrenIds.length > 0) {
+        node.childrenIds.forEach(traverse)
+      }
+    }
+    const startNode = doc.getNode(focusedNodeId) || doc.getRootNode()
+    startNode.childrenIds.forEach(traverse)
+    return list
+  }, [doc, focusedNodeId])
+
+  const handleNavigateUp = useCallback((currentId: string) => {
+    const idx = visibleNodeIds.indexOf(currentId)
+    if (idx > 0) {
+      onSetActiveId(visibleNodeIds[idx - 1])
+    }
+  }, [visibleNodeIds, onSetActiveId])
+
+  const handleNavigateDown = useCallback((currentId: string) => {
+    const idx = visibleNodeIds.indexOf(currentId)
+    if (idx !== -1 && idx < visibleNodeIds.length - 1) {
+      onSetActiveId(visibleNodeIds[idx + 1])
+    }
+  }, [visibleNodeIds, onSetActiveId])
 
   return (
     <div className="w-full max-w-3xl mx-auto px-3 sm:px-5 md:px-6 py-4 sm:py-6 pb-32 sm:pb-24">
@@ -77,10 +109,13 @@ export const TreeView: React.FC<TreeViewProps> = ({
             onOutdent={onOutdent}
             onMoveUp={onMoveUp}
             onMoveDown={onMoveDown}
+            onNavigateUp={handleNavigateUp}
+            onNavigateDown={handleNavigateDown}
             onToggleCollapse={onToggleCollapse}
             onToggleComplete={onToggleComplete}
             onZoomIn={onZoomIn}
             onSetActiveId={onSetActiveId}
+            onNavigateToWikilink={onNavigateToWikilink}
           />
         ))}
       </div>

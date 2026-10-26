@@ -16,6 +16,7 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose 
     { key: 'Shift + Tab', desc: 'Outdent item one level outward' },
     { key: 'Backspace', desc: 'Delete item when empty' },
     { key: 'Ctrl + Enter', desc: 'Toggle completion checkmark' },
+    { key: '``` or `code`', desc: 'Code block with copy button' },
     { key: 'Alt + ↑ / ↓', desc: 'Reorder item position up / down' },
     { key: 'Click Bullet', desc: 'Zoom in (hoist) into branch' },
     { key: 'Ctrl + Z', desc: 'Undo tree edit' },

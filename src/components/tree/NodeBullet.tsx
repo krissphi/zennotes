@@ -12,7 +12,7 @@ interface NodeBulletProps {
   onAddChild?: () => void
 }
 
-export const NodeBullet: React.FC<NodeBulletProps> = ({
+export const NodeBullet: React.FC<NodeBulletProps> = React.memo(({
   hasChildren,
   isCollapsed,
   isCompleted,
@@ -109,4 +109,4 @@ export const NodeBullet: React.FC<NodeBulletProps> = ({
       </div>
     </div>
   )
-}
+})

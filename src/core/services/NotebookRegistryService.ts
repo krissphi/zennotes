@@ -1,4 +1,5 @@
-import { get, set } from 'idb-keyval'
+import { get, set, del } from 'idb-keyval'
+import { TrashStorageService } from './TrashStorageService'
 
 export interface NotebookMeta {
   id: string
@@ -52,6 +53,23 @@ export class NotebookRegistryService {
     if (notebooks.length <= 1) {
       return notebooks[0].id // Keep at least one notebook
     }
+
+    // Clean up document data in IndexedDB & localStorage
+    const storageKey = this.getStorageKey(id)
+    try {
+      await del(storageKey)
+    } catch (e) {
+      console.error('Failed to delete notebook document storage:', e)
+    }
+    localStorage.removeItem(storageKey)
+
+    // Clean up trash for this notebook
+    try {
+      await TrashStorageService.clearAll(id)
+    } catch (e) {
+      console.error('Failed to delete notebook trash:', e)
+    }
+
     const filtered = notebooks.filter((nb) => nb.id !== id)
     await set(REGISTRY_KEY, filtered)
     const active = this.getActiveNotebookId()

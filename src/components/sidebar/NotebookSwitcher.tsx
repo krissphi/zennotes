@@ -24,6 +24,7 @@ export const NotebookSwitcher: React.FC<NotebookSwitcherProps> = ({
   const [newTitle, setNewTitle] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
+  const [notebookToDelete, setNotebookToDelete] = useState<NotebookMeta | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   const activeNotebook = notebooks.find((nb) => nb.id === activeId) || notebooks[0]
@@ -137,7 +138,7 @@ export const NotebookSwitcher: React.FC<NotebookSwitcherProps> = ({
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
-                          onDeleteNotebook(nb.id)
+                          setNotebookToDelete(nb)
                         }}
                         title="Delete Notebook"
                         className="p-1 hover:text-red-600 rounded"
@@ -150,6 +151,37 @@ export const NotebookSwitcher: React.FC<NotebookSwitcherProps> = ({
               )
             })}
           </div>
+
+          {/* Delete Notebook Confirmation */}
+          {notebookToDelete && (
+            <div className="p-2.5 bg-red-50 dark:bg-red-950/60 border-t border-red-200 dark:border-red-900/60 text-xs">
+              <p className="font-semibold text-red-900 dark:text-red-200">
+                Delete "{notebookToDelete.title}"?
+              </p>
+              <p className="text-[11px] text-red-700 dark:text-red-300/80 mt-0.5 leading-snug">
+                All notes and trash in this notebook will be permanently erased.
+              </p>
+              <div className="flex items-center justify-end gap-1.5 mt-2">
+                <button
+                  type="button"
+                  onClick={() => setNotebookToDelete(null)}
+                  className="px-2 py-1 text-[11px] font-medium rounded-md bg-white dark:bg-zinc-800 text-[#475569] dark:text-[#CBD5E1] border border-[#E2E8F0] dark:border-[#27272A] hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onDeleteNotebook(notebookToDelete.id)
+                    setNotebookToDelete(null)
+                  }}
+                  className="px-2.5 py-1 text-[11px] font-medium rounded-md bg-red-600 hover:bg-red-700 text-white transition-colors"
+                >
+                  Confirm Delete
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Create New Notebook Section */}
           <div className="p-1.5 bg-slate-50/70 dark:bg-zinc-900/60">

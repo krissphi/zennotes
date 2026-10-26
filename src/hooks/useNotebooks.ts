@@ -3,6 +3,8 @@ import {
   NotebookRegistryService,
   type NotebookMeta,
 } from '../core/services/NotebookRegistryService'
+import { IndexedDBStorageService } from '../core/services/IndexedDBStorageService'
+import type { TreeDocument } from '../core/models/TreeDocument'
 
 export function useNotebooks() {
   const [notebooks, setNotebooks] = useState<NotebookMeta[]>([])
@@ -29,6 +31,18 @@ export function useNotebooks() {
     return created
   }, [])
 
+  const createNotebookWithDoc = useCallback(async (doc: TreeDocument) => {
+    const title = doc.title || 'Imported Notes'
+    const created = await NotebookRegistryService.createNotebook(title)
+    const storageKey = NotebookRegistryService.getStorageKey(created.id)
+    const storageService = new IndexedDBStorageService(storageKey)
+    await storageService.saveDocument(doc.toJSON())
+    const list = await NotebookRegistryService.listNotebooks()
+    setNotebooks(list)
+    setActiveId(created.id)
+    return created
+  }, [])
+
   const renameNotebook = useCallback(async (id: string, newTitle: string) => {
     await NotebookRegistryService.renameNotebook(id, newTitle)
     const list = await NotebookRegistryService.listNotebooks()
@@ -47,6 +61,7 @@ export function useNotebooks() {
     activeNotebookId,
     switchNotebook,
     createNotebook,
+    createNotebookWithDoc,
     renameNotebook,
     deleteNotebook,
   }

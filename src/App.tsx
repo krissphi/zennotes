@@ -18,7 +18,7 @@ const SUPPRESS_KEY = 'zennotes_suppress_delete_date'
 export function App() {
   const {
     notebooks, activeNotebookId, switchNotebook,
-    createNotebook, renameNotebook, deleteNotebook,
+    createNotebook, createNotebookWithDoc, renameNotebook, deleteNotebook,
   } = useNotebooks()
 
   const {
@@ -116,6 +116,26 @@ export function App() {
     setActiveEditingId(nodeId)
     if (typeof window !== 'undefined' && window.innerWidth < 1024) {
       setIsSidebarOpen(false)
+    }
+  }
+
+  const handleNavigateToWikilink = (targetTitle: string) => {
+    const cleanTarget = targetTitle.trim().toLowerCase()
+    if (!cleanTarget) return
+
+    const all = doc.getAllNodes()
+    const target =
+      all.find((n) => n.id !== doc.rootId && n.content.trim().toLowerCase() === cleanTarget) ||
+      all.find((n) => n.id !== doc.rootId && n.content.toLowerCase().includes(cleanTarget))
+
+    if (target) {
+      handleSelectNode(target.id)
+    } else {
+      const newChild = addChild(focusedNodeId)
+      if (newChild) {
+        updateContent(newChild, targetTitle)
+        setActiveEditingId(newChild)
+      }
     }
   }
 
@@ -252,6 +272,7 @@ export function App() {
               onZoomIn={zoomToNode}
               onZoomOut={zoomOut}
               onSetActiveId={setActiveEditingId}
+              onNavigateToWikilink={handleNavigateToWikilink}
             />
           </main>
         </div>
@@ -300,6 +321,7 @@ export function App() {
         onClose={() => setIsExportOpen(false)}
         doc={doc}
         onImportDocument={replaceDocument}
+        onImportAsNewNotebook={createNotebookWithDoc}
       />
       <ShortcutsModal isOpen={isShortcutsOpen} onClose={() => setIsShortcutsOpen(false)} />
     </div>

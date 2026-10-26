@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { Search, X, CornerDownLeft, FileText } from 'lucide-react'
 import type { TreeDocument } from '../../core/models/TreeDocument'
 
@@ -28,10 +28,21 @@ export const LiveSearch: React.FC<LiveSearchProps> = ({
     }
   }, [autoFocus])
 
-  const allNodes = doc.getAllNodes().filter((n) => n.id !== doc.rootId)
-  const results = query.trim()
-    ? allNodes.filter((n) => n.content.toLowerCase().includes(query.toLowerCase())).slice(0, 8)
-    : []
+  const allNodes = useMemo(() => {
+    return doc.getAllNodes().filter((n) => n.id !== doc.rootId)
+  }, [doc])
+
+  const results = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return []
+    return allNodes
+      .filter((n) => {
+        const inContent = n.content.toLowerCase().includes(q)
+        const inNote = n.note ? n.note.toLowerCase().includes(q) : false
+        return inContent || inNote
+      })
+      .slice(0, 10)
+  }, [allNodes, query])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -151,6 +162,11 @@ export const LiveSearch: React.FC<LiveSearchProps> = ({
                       <FileText className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
                       <span>{node.content || '(empty item)'}</span>
                     </p>
+                    {node.note && node.note.toLowerCase().includes(query.trim().toLowerCase()) && (
+                      <p className="text-[10px] text-[#64748B] dark:text-[#94A3B8] italic truncate pl-4.5 mt-0.5">
+                        Note: {node.note}
+                      </p>
+                    )}
                   </div>
                   <CornerDownLeft className="w-3 h-3 text-[#64748B] dark:text-[#94A3B8] shrink-0 opacity-60" />
                 </div>

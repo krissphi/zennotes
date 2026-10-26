@@ -16,13 +16,16 @@ interface TreeNodeItemProps {
   onOutdent: (id: string) => void
   onMoveUp: (id: string) => void
   onMoveDown: (id: string) => void
+  onNavigateUp?: (id: string) => void
+  onNavigateDown?: (id: string) => void
+  onNavigateToWikilink?: (title: string) => void
   onToggleCollapse: (id: string) => void
   onToggleComplete: (id: string) => void
   onZoomIn: (id: string) => void
   onSetActiveId: (id: string) => void
 }
 
-export const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
+export const TreeNodeItem: React.FC<TreeNodeItemProps> = React.memo(({
   nodeId,
   doc,
   activeEditingId,
@@ -34,6 +37,9 @@ export const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
   onOutdent,
   onMoveUp,
   onMoveDown,
+  onNavigateUp,
+  onNavigateDown,
+  onNavigateToWikilink,
   onToggleCollapse,
   onToggleComplete,
   onZoomIn,
@@ -120,6 +126,9 @@ export const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
             onDelete={handleDeleteOrOutdent}
             onMoveUp={() => onMoveUp(node.id)}
             onMoveDown={() => onMoveDown(node.id)}
+            onNavigateUp={() => onNavigateUp?.(node.id)}
+            onNavigateDown={() => onNavigateDown?.(node.id)}
+            onNavigateToWikilink={onNavigateToWikilink}
             onToggleComplete={() => onToggleComplete(node.id)}
             onFocus={() => onSetActiveId(node.id)}
           />
@@ -201,6 +210,9 @@ export const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
               onOutdent={onOutdent}
               onMoveUp={onMoveUp}
               onMoveDown={onMoveDown}
+              onNavigateUp={onNavigateUp}
+              onNavigateDown={onNavigateDown}
+              onNavigateToWikilink={onNavigateToWikilink}
               onToggleCollapse={onToggleCollapse}
               onToggleComplete={onToggleComplete}
               onZoomIn={onZoomIn}
@@ -211,4 +223,4 @@ export const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
       )}
     </div>
   )
-}
+})

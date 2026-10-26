@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useMemo } from 'react'
 import type { TreeDocumentData } from '../core/models/TreeDocument'
 
 const MAX_HISTORY = 50
@@ -59,12 +59,15 @@ export function useDocumentHistory(initialState?: TreeDocumentData) {
     syncCapabilities()
   }, [syncCapabilities])
 
-  return {
-    pushState,
-    undo,
-    redo,
-    resetHistory,
-    canUndo: capabilities.canUndo,
-    canRedo: capabilities.canRedo,
-  }
+  return useMemo(
+    () => ({
+      pushState,
+      undo,
+      redo,
+      resetHistory,
+      canUndo: capabilities.canUndo,
+      canRedo: capabilities.canRedo,
+    }),
+    [pushState, undo, redo, resetHistory, capabilities.canUndo, capabilities.canRedo]
+  )
 }

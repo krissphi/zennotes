@@ -294,14 +294,19 @@ export class TreeDocument {
       content: 'Click the bullet point to zoom in (hoist) into any branch.',
       parentId: 'root',
     })
+    const n4 = new TreeNode({
+      id: 'n4',
+      content: '```bash\n# Code snippet with copy button\npnpm dev\n```',
+      parentId: 'root',
+    })
 
-    root.childrenIds = ['n1', 'n2', 'n3']
+    root.childrenIds = ['n1', 'n2', 'n3', 'n4']
     n1.childrenIds = ['n1_1']
     n1_1.childrenIds = ['n1_1_1']
     n2.childrenIds = ['n2_1', 'n2_2', 'n2_3', 'n2_4']
 
     const map = new Map<string, TreeNode>()
-    ;[root, n1, n1_1, n1_1_1, n2, n2_1, n2_2, n2_3, n2_4, n3].forEach((node) => {
+    ;[root, n1, n1_1, n1_1_1, n2, n2_1, n2_2, n2_3, n2_4, n3, n4].forEach((node) => {
       map.set(node.id, node)
     })
 
