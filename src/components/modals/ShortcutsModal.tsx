@@ -21,6 +21,8 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose 
     { key: 'Click Bullet', desc: 'Zoom in (hoist) into branch' },
     { key: 'Ctrl + Z', desc: 'Undo tree edit' },
     { key: 'Ctrl + Y / Ctrl+Shift+Z', desc: 'Redo tree edit' },
+    { key: 'Ctrl + Shift + C', desc: 'Collapse all sub-branches' },
+    { key: 'Ctrl + Shift + E', desc: 'Expand all sub-branches' },
     { key: 'Ctrl + K', desc: 'Open global quick search' },
   ]
 

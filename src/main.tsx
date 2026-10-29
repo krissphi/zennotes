@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
+import { ErrorBoundary } from './components/common/ErrorBoundary.tsx'
 
 // Register Service Worker for 100% offline PWA caching
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
@@ -21,6 +22,8 @@ if (typeof navigator !== 'undefined' && navigator.storage?.persist) {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </StrictMode>,
 )

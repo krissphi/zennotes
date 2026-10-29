@@ -1,5 +1,6 @@
 import { TreeDocument, type TreeDocumentData } from '../models/TreeDocument'
 import { TreeNode, type TreeNodeData } from '../models/TreeNode'
+import { getNodeDisplayText } from '../../lib/attachmentUtils'
 
 export class ExportImportService {
   public static exportToMarkdown(doc: TreeDocument): string {
@@ -39,6 +40,70 @@ export class ExportImportService {
     })
 
     return lines.join('\n')
+  }
+
+  public static exportBranchToMarkdown(doc: TreeDocument, startNodeId: string): string {
+    const startNode = doc.getNode(startNodeId)
+    if (!startNode || startNodeId === doc.rootId) {
+      return this.exportToMarkdown(doc)
+    }
+
+    const branchTitle = getNodeDisplayText(startNode.content, 'Branch Notes')
+    const lines: string[] = [`# ${branchTitle}`, '']
+
+    if (startNode.note && startNode.note.trim()) {
+      startNode.note.trim().split('\n').forEach((nLine) => {
+        lines.push(`> ${nLine}`)
+      })
+      lines.push('')
+    }
+
+    const traverse = (nodeId: string, level: number) => {
+      const node = doc.getNode(nodeId)
+      if (!node) return
+      const indent = '  '.repeat(level)
+      const prefix = node.isCompleted ? '- [x] ' : '- '
+
+      const contentLines = (node.content || '').split('\n')
+      if (contentLines.length <= 1) {
+        lines.push(`${indent}${prefix}${node.content || '(empty)'}`)
+      } else {
+        lines.push(`${indent}${prefix}${contentLines[0]}`)
+        for (let i = 1; i < contentLines.length; i++) {
+          lines.push(`${indent}  ${contentLines[i]}`)
+        }
+      }
+
+      if (node.note && node.note.trim()) {
+        const noteLines = node.note.trim().split('\n')
+        noteLines.forEach((nLine) => {
+          lines.push(`${indent}  > ${nLine}`)
+        })
+      }
+
+      node.childrenIds.forEach((childId) => {
+        traverse(childId, level + 1)
+      })
+    }
+
+    startNode.childrenIds.forEach((childId) => {
+      traverse(childId, 0)
+    })
+
+    return lines.join('\n')
+  }
+
+  public static downloadFile(content: string, filename: string, mimeType = 'text/markdown;charset=utf-8') {
+    if (typeof window === 'undefined') return
+    const blob = new Blob([content], { type: mimeType })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 2000)
   }
 
   public static exportToJSON(doc: TreeDocument): string {
@@ -155,11 +220,19 @@ export class ExportImportService {
     const map = new Map<string, TreeNode>()
     map.set('root', root)
 
-    const outlineRegex = /<outline\s+([^>]*?)(\/?>)/gi
+    const outlineRegex = /<outline\s+([^>]*?)(\/?>)|(<\/outline>)/gi
     const stack: { parentId: string }[] = [{ parentId: 'root' }]
     let match: RegExpExecArray | null
 
     while ((match = outlineRegex.exec(opmlString)) !== null) {
+      if (match[3]) {
+        // Closing tag </outline>
+        if (stack.length > 1) {
+          stack.pop()
+        }
+        continue
+      }
+
       const attrs = match[1]
       const isSelfClosing = match[2] === '/>'
 

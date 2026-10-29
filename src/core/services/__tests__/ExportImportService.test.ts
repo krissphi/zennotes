@@ -67,4 +67,49 @@ describe('ExportImportService', () => {
     expect(imported.title).toBe('My Workspace')
     expect(imported.getAllNodes().length).toBeGreaterThan(1)
   })
+
+  it('exports and imports notes containing images correctly', () => {
+    const map = new Map<string, TreeNode>()
+    const root = new TreeNode({ id: 'root', content: 'Image Workspace', parentId: null })
+    const n1 = new TreeNode({
+      id: 'n1',
+      content: 'Screenshot: ![Diagram](data:image/webp;base64,dGVzdA==)',
+      parentId: 'root',
+    })
+    root.childrenIds = ['n1']
+    map.set('root', root)
+    map.set('n1', n1)
+
+    const doc = new TreeDocument('Image Workspace', 'root', map)
+    const md = ExportImportService.exportToMarkdown(doc)
+    expect(md).toContain('![Diagram](data:image/webp;base64,dGVzdA==)')
+
+    const imported = ExportImportService.importFromMarkdown('Imported', md)
+    const impRoot = imported.getRootNode()
+    const impNode = imported.getNode(impRoot.childrenIds[0])
+    expect(impNode?.content).toContain('![Diagram](data:image/webp;base64,dGVzdA==)')
+  })
+
+  it('exports a specific branch to Markdown', () => {
+    const map = new Map<string, TreeNode>()
+    const root = new TreeNode({ id: 'root', content: 'Full Document', parentId: null })
+    const n1 = new TreeNode({ id: 'n1', content: 'Sub Branch A', note: 'Context for branch', parentId: 'root' })
+    const n1_1 = new TreeNode({ id: 'n1_1', content: 'Task 1', parentId: 'n1' })
+    const n2 = new TreeNode({ id: 'n2', content: 'Sub Branch B', parentId: 'root' })
+
+    root.childrenIds = ['n1', 'n2']
+    n1.childrenIds = ['n1_1']
+    map.set('root', root)
+    map.set('n1', n1)
+    map.set('n1_1', n1_1)
+    map.set('n2', n2)
+
+    const doc = new TreeDocument('Full Document', 'root', map)
+    const branchMd = ExportImportService.exportBranchToMarkdown(doc, 'n1')
+
+    expect(branchMd).toContain('# Sub Branch A')
+    expect(branchMd).toContain('> Context for branch')
+    expect(branchMd).toContain('- Task 1')
+    expect(branchMd).not.toContain('Sub Branch B')
+  })
 })

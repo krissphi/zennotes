@@ -1,12 +1,15 @@
 import React from 'react'
 import { ExternalLink, Tag, Link2 } from 'lucide-react'
 import { CodeBlock } from './CodeBlock'
+import { NodeImage } from './NodeImage'
+import { NodeAttachment } from './NodeAttachment'
 
 interface FormattedNodeTextProps {
   content: string
   isCompleted: boolean
   onActivate: () => void
   onNavigateToWikilink?: (title: string) => void
+  onSelectTag?: (tag: string) => void
 }
 
 function getTagStyle(tag: string): string {
@@ -31,6 +34,7 @@ export const FormattedNodeText: React.FC<FormattedNodeTextProps> = ({
   isCompleted,
   onActivate,
   onNavigateToWikilink,
+  onSelectTag,
 }) => {
   const trimmed = content.trim()
   if (!trimmed) {
@@ -79,8 +83,9 @@ export const FormattedNodeText: React.FC<FormattedNodeTextProps> = ({
     )
   }
 
-  // 2. Rich Text with URLs, Hashtags, Inline Code (`...`), and Wikilinks ([[...]])
-  const regex = /(https?:\/\/[^\s]+)|(#[a-zA-Z0-9_-]+)|(`[^`\n]+`)|(\[\[([^\]\n]+)\]\])/g
+  // 2. Rich Text with Images, Attachments, URLs, Hashtags, Inline Code (`...`), and Wikilinks ([[...]])
+  const regex =
+    /(!\[([^\]]*)\]\(([^)]+)\))|((?<!!)\[([^\]]+)\]\((data:[^)]+)\))|(https?:\/\/[^\s]+)|(#[a-zA-Z0-9_-]+)|(`[^`\n]+`)|(\[\[([^\]\n]+)\]\])/g
   const parts: React.ReactNode[] = []
   let lastIndex = 0
   let match: RegExpExecArray | null
@@ -91,8 +96,36 @@ export const FormattedNodeText: React.FC<FormattedNodeTextProps> = ({
     }
 
     if (match[1]) {
-      // URL Linkify
-      const url = match[1]
+      // 1. Markdown Image (![alt](src))
+      const alt = match[2] || ''
+      const src = match[3] || ''
+      parts.push(
+        <div key={`img-${match.index}`} onClick={(e) => e.stopPropagation()}>
+          <NodeImage src={src} alt={alt} />
+        </div>
+      )
+    } else if (match[4]) {
+      // 2. File Attachment ([filename](data:...))
+      const fileName = match[5]
+      const dataUrl = match[6]
+      const base64 = dataUrl.split(',')[1] || ''
+      const sizeBytes = Math.floor((base64.length * 3) / 4)
+      const mimeMatch = dataUrl.match(/^data:([^;,]+)/)
+      const mimeType = mimeMatch ? mimeMatch[1] : 'application/octet-stream'
+
+      parts.push(
+        <div key={`att-${match.index}`} className="my-1" onClick={(e) => e.stopPropagation()}>
+          <NodeAttachment
+            name={fileName}
+            dataUrl={dataUrl}
+            sizeBytes={sizeBytes}
+            mimeType={mimeType}
+          />
+        </div>
+      )
+    } else if (match[7]) {
+      // 3. URL Linkify
+      const url = match[7]
       parts.push(
         <a
           key={`url-${match.index}`}
@@ -106,21 +139,27 @@ export const FormattedNodeText: React.FC<FormattedNodeTextProps> = ({
           <ExternalLink className="w-3 h-3 shrink-0 inline opacity-70" />
         </a>
       )
-    } else if (match[2]) {
-      // Tag Badge
-      const tag = match[2]
+    } else if (match[8]) {
+      // 4. Tag Badge (Interactive click to filter / search)
+      const tag = match[8]
       parts.push(
-        <span
+        <button
+          type="button"
           key={`tag-${match.index}`}
-          className={`inline-flex items-center gap-1 px-1.5 py-0.2 mx-0.5 text-xs rounded-md border text-[11px] leading-tight select-none shadow-3xs ${getTagStyle(tag)}`}
+          onClick={(e) => {
+            e.stopPropagation()
+            onSelectTag?.(tag)
+          }}
+          title={`Filter by tag "${tag}"`}
+          className={`inline-flex items-center gap-1 px-1.5 py-0.2 mx-0.5 text-xs rounded-md border text-[11px] leading-tight select-none shadow-3xs cursor-pointer hover:opacity-85 hover:scale-105 active:scale-95 transition-all ${getTagStyle(tag)}`}
         >
           <Tag className="w-2.5 h-2.5 opacity-60 shrink-0" />
           <span>{tag}</span>
-        </span>
+        </button>
       )
-    } else if (match[3]) {
-      // Inline Code Snippet
-      const inlineCode = match[3].slice(1, -1)
+    } else if (match[9]) {
+      // 5. Inline Code Snippet
+      const inlineCode = match[9].slice(1, -1)
       parts.push(
         <code
           key={`code-${match.index}`}
@@ -129,9 +168,9 @@ export const FormattedNodeText: React.FC<FormattedNodeTextProps> = ({
           {inlineCode}
         </code>
       )
-    } else if (match[4]) {
-      // Wikilink / Internal Reference ([[Note Title]])
-      const linkTarget = match[5]
+    } else if (match[10]) {
+      // 6. Wikilink / Internal Reference ([[Note Title]])
+      const linkTarget = match[11]
       parts.push(
         <button
           type="button"

@@ -4,10 +4,10 @@ import { TreeNode, type TreeNodeData } from '../core/models/TreeNode'
 import { IndexedDBStorageService } from '../core/services/IndexedDBStorageService'
 import { TrashStorageService } from '../core/services/TrashStorageService'
 import { NotebookRegistryService } from '../core/services/NotebookRegistryService'
+import { BlobStorageService } from '../core/services/BlobStorageService'
 import { useDocumentHistory } from './useDocumentHistory'
 import type { TrashItem } from '../core/models/TrashItem'
-
-const storage = new IndexedDBStorageService()
+import { getNodeDisplayText } from '../lib/attachmentUtils'
 
 export function useTreeDocument(notebookId = 'default') {
   const [doc, setDoc] = useState<TreeDocument>(() => TreeDocument.createDefault())
@@ -20,6 +20,11 @@ export function useTreeDocument(notebookId = 'default') {
   const pendingDocRef = useRef<TreeDocument | null>(null)
   const historyTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const pendingHistoryStateRef = useRef<TreeDocument | null>(null)
+
+  // Isolated storage service reference locked to the active notebook
+  const activeStorageServiceRef = useRef<IndexedDBStorageService>(
+    new IndexedDBStorageService(NotebookRegistryService.getStorageKey(notebookId))
+  )
 
   const history = useDocumentHistory()
   const { pushState, resetHistory } = history
@@ -46,8 +51,9 @@ export function useTreeDocument(notebookId = 'default') {
     if (!pendingDocRef.current) return
     const docToSave = pendingDocRef.current
     pendingDocRef.current = null
+    const storageService = activeStorageServiceRef.current
     try {
-      await storage.saveDocument(docToSave.toJSON())
+      await storageService.saveDocument(docToSave.toJSON())
       setSaveStatus('saved')
     } catch (e) {
       console.error('Save failed:', e)
@@ -87,12 +93,17 @@ export function useTreeDocument(notebookId = 'default') {
   useEffect(() => {
     let isCancelled = false
     async function loadData() {
+      // Flush any pending save to the PREVIOUS storage instance before switching
       await flushSaveRef.current()
+      if (isCancelled) return
+
       setIsLoaded(false)
       const storageKey = NotebookRegistryService.getStorageKey(notebookId)
-      storage.setStorageKey(storageKey)
+      const isolatedStorage = new IndexedDBStorageService(storageKey)
+      activeStorageServiceRef.current = isolatedStorage
+
       try {
-        const loadedData = await storage.loadDocument()
+        const loadedData = await isolatedStorage.loadDocument()
         if (isCancelled) return
         if (loadedData) {
           const loadedDoc = TreeDocument.fromJSON(loadedData)
@@ -120,6 +131,17 @@ export function useTreeDocument(notebookId = 'default') {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notebookId])
+
+  // Periodic orphan blob cleanup in idle background to maintain 0 byte bloat
+  useEffect(() => {
+    if (!isLoaded) return
+    const timer = setTimeout(() => {
+      BlobStorageService.runBlobGC().catch((err) => {
+        console.warn('Background Blob GC non-fatal error:', err)
+      })
+    }, 4000)
+    return () => clearTimeout(timer)
+  }, [isLoaded])
 
   const mutateDoc = useCallback(
     (
@@ -182,37 +204,51 @@ export function useTreeDocument(notebookId = 'default') {
     mutateDoc((cloned) => { cloned.getNode(nodeId)?.setNote(note) }, undefined, true)
   }, [mutateDoc])
 
-  const addSibling = useCallback((refId: string) => {
+  const addSibling = useCallback((refId: string, content = '') => {
     let createdId: string | null = null
-    mutateDoc((cloned) => { createdId = cloned.createSiblingNode(refId).id })
+    mutateDoc((cloned) => { createdId = cloned.createSiblingNode(refId, content).id })
     if (createdId) setActiveEditingId(createdId)
     return createdId
   }, [mutateDoc])
 
-  const addChild = useCallback((parentId: string) => {
+  const addChild = useCallback((parentId: string, content = '') => {
     let createdId: string | null = null
-    mutateDoc((cloned) => { createdId = cloned.createChildNode(parentId).id })
+    mutateDoc((cloned) => { createdId = cloned.createChildNode(parentId, undefined, content).id })
     if (createdId) setActiveEditingId(createdId)
     return createdId
   }, [mutateDoc])
 
-  const deleteNode = useCallback((nodeId: string) => {
+  const deleteNode = useCallback((nodeId: string, permanent = false) => {
     const node = doc.getNode(nodeId)
     if (node && nodeId !== doc.rootId) {
       const descendants = doc.getDescendantIds(nodeId)
         .map((dId) => doc.getNode(dId)?.toJSON())
         .filter((d): d is TreeNodeData => Boolean(d))
 
-      TrashStorageService.addTrashItem({
-        id: `trash_${Date.now()}_${node.id}`,
-        title: node.content || '(Untitled item)',
-        note: node.note,
-        notebookId,
-        originalParentId: node.parentId,
-        deletedAt: Date.now(),
-        nodeData: node.toJSON(),
-        descendants,
-      }, notebookId).then(setTrashItems)
+      if (!permanent) {
+        TrashStorageService.addTrashItem({
+          id: `trash_${Date.now()}_${node.id}`,
+          title: getNodeDisplayText(node.content, '(Untitled item)'),
+          note: node.note,
+          notebookId,
+          originalParentId: node.parentId,
+          deletedAt: Date.now(),
+          nodeData: node.toJSON(),
+          descendants,
+        }, notebookId).then(setTrashItems)
+      } else {
+        // Direct permanent deletion: clean up any attached binary blobs immediately
+        const texts = [
+          node.content,
+          node.note || '',
+          ...descendants.map((d) => `${d.content} ${d.note || ''}`),
+        ]
+        for (const text of texts) {
+          for (const bId of BlobStorageService.extractBlobIds(text)) {
+            BlobStorageService.deleteBlob(bId).catch(() => {})
+          }
+        }
+      }
     }
 
     let nextFocus: string | null = null
@@ -230,13 +266,40 @@ export function useTreeDocument(notebookId = 'default') {
     TrashStorageService.removeTrashItem(item.id, notebookId).then(setTrashItems)
   }, [mutateDoc, notebookId])
 
-  const permanentlyDeleteTrash = useCallback((id: string) => {
-    TrashStorageService.removeTrashItem(id, notebookId).then(setTrashItems)
-  }, [notebookId])
+  const permanentlyDeleteTrash = useCallback(async (id: string) => {
+    const item = trashItems.find((t) => t.id === id)
+    if (item) {
+      const texts = [
+        item.nodeData.content,
+        item.nodeData.note || '',
+        ...item.descendants.map((d) => `${d.content} ${d.note || ''}`),
+      ]
+      for (const text of texts) {
+        for (const bId of BlobStorageService.extractBlobIds(text)) {
+          await BlobStorageService.deleteBlob(bId)
+        }
+      }
+    }
+    const updated = await TrashStorageService.removeTrashItem(id, notebookId)
+    setTrashItems(updated)
+  }, [notebookId, trashItems])
 
-  const emptyTrash = useCallback(() => {
-    TrashStorageService.clearAll(notebookId).then(() => setTrashItems([]))
-  }, [notebookId])
+  const emptyTrash = useCallback(async () => {
+    for (const item of trashItems) {
+      const texts = [
+        item.nodeData.content,
+        item.nodeData.note || '',
+        ...item.descendants.map((d) => `${d.content} ${d.note || ''}`),
+      ]
+      for (const text of texts) {
+        for (const bId of BlobStorageService.extractBlobIds(text)) {
+          await BlobStorageService.deleteBlob(bId)
+        }
+      }
+    }
+    await TrashStorageService.clearAll(notebookId)
+    setTrashItems([])
+  }, [notebookId, trashItems])
 
   const indentNode = useCallback((nodeId: string) => {
     mutateDoc((cloned) => { cloned.indentNode(nodeId) }, nodeId)
@@ -252,6 +315,14 @@ export function useTreeDocument(notebookId = 'default') {
 
   const toggleCollapse = useCallback((nodeId: string) => {
     mutateDoc((cloned) => { cloned.getNode(nodeId)?.toggleCollapse() })
+  }, [mutateDoc])
+
+  const collapseAll = useCallback((fromNodeId?: string) => {
+    mutateDoc((cloned) => { cloned.collapseAll(fromNodeId) })
+  }, [mutateDoc])
+
+  const expandAll = useCallback((fromNodeId?: string) => {
+    mutateDoc((cloned) => { cloned.expandAll(fromNodeId) })
   }, [mutateDoc])
 
   const toggleComplete = useCallback((nodeId: string) => {
@@ -300,6 +371,8 @@ export function useTreeDocument(notebookId = 'default') {
     outdentNode,
     moveNode,
     toggleCollapse,
+    collapseAll,
+    expandAll,
     toggleComplete,
     zoomToNode,
     zoomOut,

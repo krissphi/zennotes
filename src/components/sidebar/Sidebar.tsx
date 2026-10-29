@@ -1,9 +1,11 @@
-import React, { useState } from 'react'
-import { Network, Home, X, Search } from 'lucide-react'
+import React, { useState, useMemo } from 'react'
+import { Network, Home, X, Search, HardDrive } from 'lucide-react'
 import { SidebarTreeItem } from './SidebarTreeItem'
 import { NotebookSwitcher } from './NotebookSwitcher'
 import type { TreeDocument } from '../../core/models/TreeDocument'
 import type { NotebookMeta } from '../../core/services/NotebookRegistryService'
+import { getNodeDisplayText } from '../../lib/attachmentUtils'
+import { useStorageEstimate } from '../../hooks/useStorageEstimate'
 
 interface SidebarProps {
   onClose: () => void
@@ -31,14 +33,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onDeleteNotebook,
 }) => {
   const [filterText, setFilterText] = useState('')
+  const storage = useStorageEstimate()
   const rootNode = doc.getRootNode()
   const isRootFocused = focusedNodeId === doc.rootId
 
-  // If there's filter text, show matching items flat
-  const allNodes = doc.getAllNodes().filter((n) => n.id !== doc.rootId)
-  const filteredNodes = filterText.trim()
-    ? allNodes.filter((n) => n.content.toLowerCase().includes(filterText.toLowerCase()))
-    : null
+  // If there's filter text, show matching items flat (memoized to prevent linear scans on unneeded renders)
+  const filteredNodes = useMemo(() => {
+    const query = filterText.trim().toLowerCase()
+    if (!query) return null
+    return doc
+      .getAllNodes()
+      .filter((n) => n.id !== doc.rootId && n.content.toLowerCase().includes(query))
+  }, [doc, filterText])
 
   const handleNodeClick = (nodeId: string) => {
     onSelectNode(nodeId)
@@ -116,7 +122,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Tree Content */}
-      <div className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5">
+      <div role="tree" aria-label="Tree navigation map" className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5">
         {filteredNodes ? (
           filteredNodes.length > 0 ? (
             filteredNodes.map((node) => (
@@ -129,7 +135,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     : 'text-[#475569] dark:text-[#CBD5E1] hover:bg-slate-200/60 dark:hover:bg-zinc-800/80'
                 }`}
               >
-                {node.content || '(empty item)'}
+                {getNodeDisplayText(node.content) || '(empty item)'}
               </div>
             ))
           ) : (
@@ -150,11 +156,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
       </div>
 
-      {/* Footer Info */}
-      <div className="px-3.5 py-2.5 border-t border-[#E2E8F0] dark:border-[#27272A] text-[11px] text-[#64748B] dark:text-[#94A3B8] flex items-center justify-between">
-        <span>Total: {doc.getAllNodes().length - 1} items</span>
-        <span className="text-[10px] text-emerald-600 dark:text-emerald-400">Click to focus</span>
-      </div>
+      {/* Storage Estimate */}
+      {storage.isSupported && (
+        <div className="p-3 border-t border-[#E2E8F0] dark:border-[#27272A] bg-white/60 dark:bg-zinc-900/40 space-y-1.5">
+          <div className="flex items-center justify-between text-xs text-[#64748B] dark:text-[#94A3B8]">
+            <div className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
+              <HardDrive className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Storage</span>
+            </div>
+            <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+              {storage.usageFormatted} / {storage.quotaFormatted}
+            </span>
+          </div>
+          <div className="w-full h-1 bg-slate-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-emerald-500 rounded-full transition-all duration-300"
+              style={{ width: `${Math.max(2, storage.percentage)}%` }}
+            />
+          </div>
+        </div>
+      )}
     </aside>
   )
 }

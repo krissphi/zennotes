@@ -119,4 +119,43 @@ describe('TreeDocument', () => {
       expect(doc.getNode(d.id)).toBeDefined()
     })
   })
+
+  it('collapses and expands all nodes properly', () => {
+    // n1 has children (n1_1)
+    expect(doc.getNode('n1')?.hasChildren()).toBe(true)
+
+    // Collapse all
+    doc.collapseAll()
+    expect(doc.getNode('n1')?.isCollapsed).toBe(true)
+
+    // Expand all
+    doc.expandAll()
+    expect(doc.getNode('n1')?.isCollapsed).toBe(false)
+  })
+
+  it('accurately indexes and finds backlinks for wikilinks', () => {
+    const target = doc.createChildNode(doc.rootId, undefined, 'Project Roadmap')
+    const linker1 = doc.createChildNode(doc.rootId, undefined, 'Check out [[Project Roadmap]] for details')
+    const linker2 = doc.createChildNode(doc.rootId, undefined, 'Unrelated item')
+    linker2.setNote('See also [[Project Roadmap]] in roadmap notes')
+
+    const backlinks = doc.getNodesLinkingTo('Project Roadmap', target.id)
+    const backlinkIds = backlinks.map((b) => b.id)
+    expect(backlinkIds).toContain(linker1.id)
+    expect(backlinkIds).toContain(linker2.id)
+    expect(backlinkIds).not.toContain(target.id)
+
+    // Lookup for non-existent target
+    expect(doc.getNodesLinkingTo('Non Existent')).toEqual([])
+  })
+
+  it('computes breadcrumbs hierarchy up to root', () => {
+    // n1_1_1 -> n1_1 -> n1 -> root
+    const crumbs = doc.getBreadcrumbs('n1_1_1')
+    expect(crumbs.length).toBe(4)
+    expect(crumbs[0].id).toBe('root')
+    expect(crumbs[1].id).toBe('n1')
+    expect(crumbs[2].id).toBe('n1_1')
+    expect(crumbs[3].id).toBe('n1_1_1')
+  })
 })

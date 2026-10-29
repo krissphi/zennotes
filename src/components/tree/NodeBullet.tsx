@@ -34,6 +34,7 @@ export const NodeBullet: React.FC<NodeBulletProps> = React.memo(({
             }}
             className="w-5 h-5 flex items-center justify-center rounded text-[#64748B] dark:text-[#94A3B8] hover:text-[#0F172A] dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors shrink-0 active:scale-95"
             title={isCollapsed ? 'Expand branch' : 'Collapse branch'}
+            aria-label={isCollapsed ? 'Expand branch' : 'Collapse branch'}
           >
             {isCollapsed ? (
               <ChevronRight className="w-3.5 h-3.5 shrink-0" />
@@ -55,6 +56,11 @@ export const NodeBullet: React.FC<NodeBulletProps> = React.memo(({
         <button
           onClick={isCompleted && onToggleComplete ? onToggleComplete : onZoomIn}
           title={
+            isCompleted
+              ? 'Click to unmark as completed'
+              : 'Click to zoom into this branch'
+          }
+          aria-label={
             isCompleted
               ? 'Click to unmark as completed'
               : 'Click to zoom into this branch'

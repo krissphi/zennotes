@@ -19,4 +19,24 @@ export default defineConfig({
     host: true,
     port: 4173,
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
+            return 'vendor'
+          }
+          if (id.includes('node_modules/lucide-react')) {
+            return 'icons'
+          }
+          if (id.includes('node_modules/minisearch')) {
+            return 'search'
+          }
+          if (id.includes('node_modules/idb-keyval')) {
+            return 'storage'
+          }
+        },
+      },
+    },
+  },
 })

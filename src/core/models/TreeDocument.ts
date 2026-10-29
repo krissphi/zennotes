@@ -11,11 +11,48 @@ export class TreeDocument {
   public title: string
   public rootId: string
   private nodes: Map<string, TreeNode>
+  private wikilinkMapCache: Map<string, string[]> | null = null
 
   constructor(title: string, rootId: string, nodes: Map<string, TreeNode>) {
     this.title = title
     this.rootId = rootId
     this.nodes = nodes
+  }
+
+  /**
+   * Fast indexed lookup of all nodes that link to targetTitle via [[WikiLink]] syntax.
+   * Built once per TreeDocument instance and cached for O(1) retrieval.
+   */
+  public getNodesLinkingTo(targetTitle: string, excludeId?: string): TreeNode[] {
+    const cleanTarget = targetTitle.trim().toLowerCase()
+    if (!cleanTarget) return []
+
+    if (!this.wikilinkMapCache) {
+      this.wikilinkMapCache = new Map()
+      for (const node of this.nodes.values()) {
+        if (node.id === this.rootId) continue
+        const text = `${node.content} ${node.note || ''}`.toLowerCase()
+        if (!text.includes('[[')) continue
+
+        const matches = text.matchAll(/\[\[(.*?)\]\]/g)
+        for (const m of matches) {
+          const link = m[1].trim().toLowerCase()
+          if (link) {
+            const list = this.wikilinkMapCache.get(link) || []
+            if (!list.includes(node.id)) {
+              list.push(node.id)
+              this.wikilinkMapCache.set(link, list)
+            }
+          }
+        }
+      }
+    }
+
+    const nodeIds = this.wikilinkMapCache.get(cleanTarget) || []
+    return nodeIds
+      .filter((id) => id !== excludeId)
+      .map((id) => this.nodes.get(id))
+      .filter((n): n is TreeNode => Boolean(n))
   }
 
   public getNode(id: string): TreeNode | undefined {
@@ -240,6 +277,38 @@ export class TreeDocument {
       }
     }
     return descendants
+  }
+
+  public collapseAll(fromNodeId?: string): void {
+    const targetNodeId = fromNodeId || this.rootId
+    const nodeIds = targetNodeId === this.rootId
+      ? Array.from(this.nodes.keys())
+      : [targetNodeId, ...this.getDescendantIds(targetNodeId)]
+
+    nodeIds.forEach((id) => {
+      if (id !== this.rootId) {
+        const node = this.nodes.get(id)
+        if (node && node.hasChildren()) {
+          node.isCollapsed = true
+          node.touch()
+        }
+      }
+    })
+  }
+
+  public expandAll(fromNodeId?: string): void {
+    const targetNodeId = fromNodeId || this.rootId
+    const nodeIds = targetNodeId === this.rootId
+      ? Array.from(this.nodes.keys())
+      : [targetNodeId, ...this.getDescendantIds(targetNodeId)]
+
+    nodeIds.forEach((id) => {
+      const node = this.nodes.get(id)
+      if (node && node.hasChildren()) {
+        node.isCollapsed = false
+        node.touch()
+      }
+    })
   }
 
   public clone(): TreeDocument {

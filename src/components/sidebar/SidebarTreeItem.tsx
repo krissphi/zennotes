@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { ChevronRight, ChevronDown, CircleDot, FileText } from 'lucide-react'
 import type { TreeDocument } from '../../core/models/TreeDocument'
+import { getNodeDisplayText } from '../../lib/attachmentUtils'
 
 interface SidebarTreeItemProps {
   nodeId: string
@@ -25,7 +26,14 @@ export const SidebarTreeItem: React.FC<SidebarTreeItemProps> = ({
   const isFocused = node.id === focusedNodeId
 
   return (
-    <div className="flex flex-col select-none text-xs">
+    <div
+      role="treeitem"
+      aria-expanded={hasChildren ? isExpanded : undefined}
+      aria-selected={isFocused}
+      aria-level={depth + 1}
+      aria-label={getNodeDisplayText(node.content) || 'Untitled item'}
+      className="flex flex-col select-none text-xs"
+    >
       <div
         className={`flex items-center gap-1.5 py-1 px-2 rounded-lg cursor-pointer transition-colors group ${
           isFocused
@@ -42,6 +50,7 @@ export const SidebarTreeItem: React.FC<SidebarTreeItemProps> = ({
               e.stopPropagation()
               setIsExpanded((prev) => !prev)
             }}
+            aria-label={isExpanded ? 'Collapse' : 'Expand'}
             className="w-4 h-4 flex items-center justify-center rounded text-[#64748B] dark:text-[#94A3B8] hover:text-[#0F172A] dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5"
           >
             {isExpanded ? (
@@ -65,7 +74,7 @@ export const SidebarTreeItem: React.FC<SidebarTreeItemProps> = ({
 
         {/* Node Title */}
         <span className="truncate flex-1">
-          {node.content.trim() ? node.content : '(empty item)'}
+          {getNodeDisplayText(node.content) || '(empty item)'}
         </span>
 
         {/* Children count badge */}
@@ -78,7 +87,7 @@ export const SidebarTreeItem: React.FC<SidebarTreeItemProps> = ({
 
       {/* Render children recursively */}
       {hasChildren && isExpanded && (
-        <div className="flex flex-col">
+        <div role="group" className="flex flex-col">
           {node.childrenIds.map((childId) => (
             <SidebarTreeItem
               key={childId}

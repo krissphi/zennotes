@@ -18,16 +18,32 @@ All notes are stored directly on your device using IndexedDB with the Persistent
 
 ## Key Features
 
+- **Decoupled Blob Storage (`BlobStorageService`)**: Large attachments (PDF, DOCX, XLSX, ZIP, audio) and images are stored in a dedicated IndexedDB blob store. Notes store only lightweight references (`zenblob:...`), slashing document RAM usage by >95% and keeping Undo/Redo snappy even with hundreds of files.
+- **Fast Fuzzy Full-Text Search (MiniSearch)**: Built-in offline search engine with typo tolerance, prefix searching, and tag-boosted ranking without searching through raw base64 data.
+- **Linked References (Backlinks Pane)**: Hoisting into any branch reveals a collapsible Linked References panel displaying every other note that mentions `[[This Branch Title]]` with one-click navigation.
+- **Virtual Scrolling Windowing**: Branches with >40 items automatically activate smooth windowed virtualization, rendering thousands of nested notes at 60/120 FPS.
+- **Global Error Boundary & Emergency Backup**: Protects against unexpected runtime crashes with a recovery screen offering a one-click direct export of your data from IndexedDB.
+- **Isolated Storage Services**: Concurrent storage instances prevent race conditions when switching rapidly between notebooks.
 - **Infinite Nested Branches**: Break complex projects and thoughts down into recursive sub-items effortlessly.
 - **Bullet Zoom & Breadcrumbs**: Hoist into any node with a single click. Navigate parent levels using clean breadcrumb navigation.
 - **Local-First Persistent Storage**: Powered by IndexedDB with automatic requests for persistent browser storage, protecting your notes from browser cache cleanup.
 - **Multi-Notebook Workspace**: Create, rename, switch, and delete independent notebooks from the collapsible sidebar. Deletion includes confirmation prompts and cleans up underlying storage completely.
 - **7-Day Isolated Recycle Bin**: Deleted items are preserved in a recycle bin per notebook for 7 days before permanent removal, with full recursive sub-tree restore capabilities.
 - **Intelligent Undo/Redo (Ctrl+Z / Ctrl+Y)**: Debounced text history prevents character-by-character buffer exhaustion, while structural mutations (indent, outdent, move, delete) are recorded instantly.
-- **Tags, URLs & Bi-directional Wikilinks**:
-  - `#tags`: Automatic color-coded pill badges for `#todo`, `#important`, `#idea`, `#done`, etc.
+- **Tags, URLs & Interactive Bi-directional Wikilinks**:
+  - `#tags`: Automatic color-coded pill badges (`#todo`, `#important`, `#idea`, `#done`, etc.). **Clicking any tag badge immediately filters/searches all matching notes**.
   - Web URLs: Clickable hyperlinks without interfering with text editing.
   - `[[Wikilinks]]`: Type `[[Note Title]]` to create interactive internal links. Clicking jumps/zooms directly to the matching note or creates it automatically.
+- **Rich Media & File Attachments (Images, PDF, DOCX, XLSX, ZIP, Audio)**:
+  - **Images**: Paste screenshots or images (`Ctrl+V`), drag & drop, or attach with the paperclip button. Automatic client-side WebP compression (82% quality, max 1440px), fullscreen Lightbox viewer, zoom, copy, and download.
+  - **Documents & Files**: Store and organize any document (PDF, Word `.docx`, Excel `.xlsx`, PowerPoint `.pptx`, archives `.zip`, audio, code, and text) up to 25 MB per file directly in local IndexedDB.
+  - **Visual Attachment Cards**: Color-coded category badges with formatted file sizes (e.g. `2.4 MB PDF`, `850 KB DOCX`, `1.2 MB ZIP`).
+  - **Instant Preview & Download**: One-click in-browser PDF/document preview in a new tab, or direct download with original filename.
+  - **Paperclip File Picker & Drag-and-Drop**: Desktop hover action button to browse your filesystem, or drop files directly onto any note or the workspace canvas.
+- **Local Storage Meter (`navigator.storage.estimate`)**: Real-time minimalist meter in the sidebar displaying offline storage used vs total browser quota dynamically formatted in B, KB, MB, and GB.
+- **Local Folder Vault (File System Access API / Obsidian Sync)**: Connect a local folder on your computer to auto-sync notes as plain `.md` files on your hard drive, allowing instant interoperability with Obsidian and VS Code.
+- **Collapse All & Expand All (`Ctrl+Shift+C` / `Ctrl+Shift+E`)**: Rapidly tidy up or expand complex deeply-nested document trees in a single click or keystroke.
+- **Single-Branch Markdown Export**: In addition to full-workspace exports, download just the currently focused branch as a clean `.md` document directly from the `BranchHeader` toolbar.
 - **Terminal-Style Code Blocks & One-Click Copy**: Type ` ```lang ` to format notes into sleek terminal-style code blocks with syntax highlighting, language badges, and a copy button. Inline `code` is also supported.
 - **Instant Live Search (Ctrl+K)**: Instant keyboard-driven search matching note content, sub-notes, and breadcrumb paths with arrow-key navigation.
 - **Universal Export & Import**:
@@ -58,6 +74,7 @@ All notes are stored directly on your device using IndexedDB with the Persistent
 | **Arrow Up** *(at start of note)* | Move focus to previous visible note |
 | **Arrow Down** *(at end of note)* | Move focus to next visible note |
 | **Ctrl + Enter** | Toggle task completion (strikethrough & checkmark) |
+| **Ctrl + V** | Paste clipboard screenshot or image directly into note or workspace |
 | **\`\`\`lang** or **\`code\`** | Code block with syntax highlighting and copy button |
 | **\[\[Note Title\]\]** | Bi-directional internal link to jump to or create another note |
 
@@ -68,6 +85,8 @@ All notes are stored directly on your device using IndexedDB with the Persistent
 | **Ctrl + K** | Open fast live search modal |
 | **Ctrl + Z** | Undo last edit or structural tree change |
 | **Ctrl + Y** / **Ctrl + Shift + Z** | Redo action |
+| **Ctrl + Shift + C** | Collapse all sub-branches (tidy up tree) |
+| **Ctrl + Shift + E** | Expand all sub-branches |
 | **Ctrl + P** | Open print-optimized document view / PDF export |
 | **Escape** | Close open modals, search dropdowns, or active dialogs |
 
