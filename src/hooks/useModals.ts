@@ -15,6 +15,7 @@ export function useModals() {
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false)
   const [isTrashOpen, setIsTrashOpen] = useState(false)
   const [isVaultOpen, setIsVaultOpen] = useState(false)
+  const [isGraphOpen, setIsGraphOpen] = useState(false)
   const [nodeToDelete, setNodeToDelete] = useState<NodeToDelete | null>(null)
 
   // Cache delete confirmation suppression in state to avoid reading localStorage on every delete request
@@ -76,6 +77,7 @@ export function useModals() {
     setIsShortcutsOpen(false)
     setIsTrashOpen(false)
     setIsVaultOpen(false)
+    setIsGraphOpen(false)
     setNodeToDelete(null)
   }, [])
 
@@ -88,6 +90,8 @@ export function useModals() {
     setIsTrashOpen,
     isVaultOpen,
     setIsVaultOpen,
+    isGraphOpen,
+    setIsGraphOpen,
     nodeToDelete,
     setNodeToDelete,
     requestDeleteNode,

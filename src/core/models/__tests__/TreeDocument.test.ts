@@ -158,4 +158,21 @@ describe('TreeDocument', () => {
     expect(crumbs[2].id).toBe('n1_1')
     expect(crumbs[3].id).toBe('n1_1_1')
   })
+
+  it('performs fine-grained mutation with structural sharing', () => {
+    const originalN2 = doc.getNode('n2')
+    const originalN3 = doc.getNode('n3')
+
+    const newDoc = doc.cloneWithNodeUpdate('n2', (node) => {
+      node.setContent('Updated content for n2')
+    })
+
+    // The modified node has updated content and a new object identity
+    expect(newDoc.getNode('n2')?.content).toBe('Updated content for n2')
+    expect(newDoc.getNode('n2')).not.toBe(originalN2)
+
+    // Unmodified nodes preserve exact object identity by reference (structural sharing)
+    expect(newDoc.getNode('n3')).toBe(originalN3)
+    expect(originalN2?.content).toBe('Quick Keyboard Shortcuts:')
+  })
 })

@@ -1,10 +1,10 @@
 import React from 'react'
-import { Plus, Trash2, Check, X, ChevronUp, ChevronDown, Paperclip } from 'lucide-react'
 import { NodeBullet } from './NodeBullet'
 import { NodeContent } from './NodeContent'
+import { TreeNodeActions } from './TreeNodeActions'
 import type { TreeDocument } from '../../core/models/TreeDocument'
 import { processImageFile } from '../../lib/imageUtils'
-import { processAttachmentFile, getNodeDisplayText } from '../../lib/attachmentUtils'
+import { processAttachmentFile, getNodeDisplayText, parseNodeMedia } from '../../lib/attachmentUtils'
 import { toast } from '../../lib/toast'
 
 interface TreeNodeItemProps {
@@ -23,11 +23,11 @@ interface TreeNodeItemProps {
   onNavigateDown?: (id: string) => void
   onNavigateToWikilink?: (title: string) => void
   onToggleCollapse: (id: string) => void
-  onToggleComplete: (id: string) => void
   onZoomIn: (id: string) => void
-  onSetActiveId: (id: string) => void
+  onSetActiveId: (id: string | null) => void
   onSelectTag?: (tag: string) => void
   depth?: number
+  renderChildren?: boolean
 }
 
 export const TreeNodeItem: React.FC<TreeNodeItemProps> = React.memo(({
@@ -46,11 +46,11 @@ export const TreeNodeItem: React.FC<TreeNodeItemProps> = React.memo(({
   onNavigateDown,
   onNavigateToWikilink,
   onToggleCollapse,
-  onToggleComplete,
   onZoomIn,
   onSetActiveId,
   onSelectTag,
   depth = 1,
+  renderChildren = true,
 }) => {
   const touchStartX = React.useRef<number | null>(null)
   const touchStartY = React.useRef<number | null>(null)
@@ -58,7 +58,6 @@ export const TreeNodeItem: React.FC<TreeNodeItemProps> = React.memo(({
 
   const handleToggleCollapse = React.useCallback(() => onToggleCollapse(nodeId), [onToggleCollapse, nodeId])
   const handleZoomIn = React.useCallback(() => onZoomIn(nodeId), [onZoomIn, nodeId])
-  const handleToggleComplete = React.useCallback(() => onToggleComplete(nodeId), [onToggleComplete, nodeId])
   const handleAddChild = React.useCallback(() => onAddChild(nodeId), [onAddChild, nodeId])
   const handleUpdateContent = React.useCallback((val: string) => onUpdateContent(nodeId, val), [onUpdateContent, nodeId])
   const handleAddSibling = React.useCallback(() => onAddSibling(nodeId), [onAddSibling, nodeId])
@@ -69,6 +68,7 @@ export const TreeNodeItem: React.FC<TreeNodeItemProps> = React.memo(({
   const handleNavigateUp = React.useCallback(() => onNavigateUp?.(nodeId), [onNavigateUp, nodeId])
   const handleNavigateDown = React.useCallback(() => onNavigateDown?.(nodeId), [onNavigateDown, nodeId])
   const handleFocus = React.useCallback(() => onSetActiveId(nodeId), [onSetActiveId, nodeId])
+  const handleBlur = React.useCallback(() => onSetActiveId(null), [onSetActiveId])
 
   const handleNavigateLeft = React.useCallback(() => {
     const currentNode = doc.getNode(nodeId)
@@ -112,18 +112,34 @@ export const TreeNodeItem: React.FC<TreeNodeItemProps> = React.memo(({
     if (files.length === 0) return
 
     try {
+      const { images, attachments } = parseNodeMedia(currentNode.content)
       const markdowns: string[] = []
       for (const f of files) {
         if (f.type.startsWith('image/')) {
           const res = await processImageFile(f)
+          const isDuplicate = images.some((img) => img.src === res.dataUrl)
+          if (isDuplicate) {
+            toast.info(`Image "${res.name}" is already attached to this note`)
+            continue
+          }
           markdowns.push(res.markdown)
         } else {
           const res = await processAttachmentFile(f)
+          const isDuplicate = attachments.some(
+            (att) =>
+              att.dataUrl.split('?')[0] === res.dataUrl.split('?')[0] ||
+              (att.name.toLowerCase() === res.name.toLowerCase() && att.sizeBytes === f.size)
+          )
+          if (isDuplicate) {
+            toast.info(`File "${res.name}" is already attached to this note`)
+            continue
+          }
           markdowns.push(res.markdown)
         }
       }
+      if (markdowns.length === 0) return
       const newMedia = markdowns.join('\n')
-      const updated = currentNode.content.trim() ? `${currentNode.content.trim()}\n${newMedia}` : newMedia
+      const updated = currentNode.content ? `${currentNode.content}\n${newMedia}` : newMedia
       onUpdateContent(nodeId, updated)
     } catch (err: unknown) {
       if (err instanceof Error) toast.error(err.message)
@@ -168,8 +184,16 @@ export const TreeNodeItem: React.FC<TreeNodeItemProps> = React.memo(({
       aria-label={getNodeDisplayText(node.content, 'Untitled item')}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
-      className="flex flex-col group/row"
+      style={!renderChildren && depth > 1 ? { paddingLeft: `${(depth - 1) * 20}px` } : undefined}
+      className="flex flex-col group/row relative"
     >
+      {/* Flattened virtual guide line indicator */}
+      {!renderChildren && depth > 1 && (
+        <div
+          className="absolute top-0 bottom-0 pointer-events-none border-l border-[#E2E8F0]/70 dark:border-[#27272A]/70"
+          style={{ left: `${(depth - 1) * 20 - 10}px` }}
+        />
+      )}
       {/* Node Row */}
       <div
         className={`flex items-start gap-1.5 py-0.5 px-1 rounded-lg transition-colors relative ${
@@ -183,11 +207,9 @@ export const TreeNodeItem: React.FC<TreeNodeItemProps> = React.memo(({
           <NodeBullet
             hasChildren={hasChildren}
             isCollapsed={node.isCollapsed}
-            isCompleted={node.isCompleted}
             isEditing={isEditing}
             onToggleCollapse={handleToggleCollapse}
             onZoomIn={handleZoomIn}
-            onToggleComplete={handleToggleComplete}
             onAddChild={handleAddChild}
           />
         </div>
@@ -197,7 +219,6 @@ export const TreeNodeItem: React.FC<TreeNodeItemProps> = React.memo(({
           <NodeContent
             nodeId={node.id}
             content={node.content}
-            isCompleted={node.isCompleted}
             isFocused={isEditing}
             onChange={handleUpdateContent}
             onAddSibling={handleAddSibling}
@@ -211,92 +232,27 @@ export const TreeNodeItem: React.FC<TreeNodeItemProps> = React.memo(({
             onNavigateLeft={handleNavigateLeft}
             onNavigateRight={handleNavigateRight}
             onNavigateToWikilink={onNavigateToWikilink}
-            onToggleComplete={handleToggleComplete}
             onFocus={handleFocus}
+            onBlur={handleBlur}
             onSelectTag={onSelectTag}
           />
         </div>
 
-        {/* Quick Actions (Desktop mouse hover only — never stealing text space on mobile or during active typing) */}
-        <div className="hidden sm:flex items-center gap-0.5 transition-opacity pr-1 pt-0.5 shrink-0 opacity-0 group-hover/row:opacity-100">
-          {/* Quick Reorder Up / Down buttons */}
-          <button
-            onClick={() => onMoveUp(node.id)}
-            title="Move up (Alt + ↑)"
-            className="hidden sm:inline-flex p-1 rounded text-[#64748B] dark:text-[#94A3B8] hover:text-[#0F172A] dark:hover:text-white hover:bg-slate-200/80 dark:hover:bg-zinc-700 transition-colors"
-          >
-            <ChevronUp className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={() => onMoveDown(node.id)}
-            title="Move down (Alt + ↓)"
-            className="hidden sm:inline-flex p-1 rounded text-[#64748B] dark:text-[#94A3B8] hover:text-[#0F172A] dark:hover:text-white hover:bg-slate-200/80 dark:hover:bg-zinc-700 transition-colors"
-          >
-            <ChevronDown className="w-3.5 h-3.5" />
-          </button>
-
-          {/* Complete / Uncomplete */}
-          <button
-            onClick={() => onToggleComplete(node.id)}
-            title={
-              node.isCompleted
-                ? 'Mark incomplete (Ctrl + Enter)'
-                : 'Mark complete (Ctrl + Enter)'
-            }
-            className={`p-1 rounded transition-colors ${
-              node.isCompleted
-                ? 'text-amber-700 dark:text-amber-400 hover:text-amber-800 hover:bg-amber-100/60 dark:hover:bg-amber-950/40'
-                : 'text-[#64748B] dark:text-[#94A3B8] hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-200/80 dark:hover:bg-zinc-700'
-            }`}
-          >
-            {node.isCompleted ? (
-              <X className="w-3.5 h-3.5" />
-            ) : (
-              <Check className="w-3.5 h-3.5" />
-            )}
-          </button>
-
-          {/* Add child */}
-          <button
-            onClick={() => onAddChild(node.id)}
-            title="Add sub-item (Child)"
-            className="hidden sm:inline-flex p-1 rounded text-[#64748B] dark:text-[#94A3B8] hover:text-[#0F172A] dark:hover:text-white hover:bg-slate-200/80 dark:hover:bg-zinc-700 transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5" />
-          </button>
-
-          {/* Attach file (Images, PDF, Docs, Archives...) */}
-          <button
-            onClick={handleAttachClick}
-            title="Attach file (Images, PDF, Docs, Archives...)"
-            className="hidden sm:inline-flex p-1 rounded text-[#64748B] dark:text-[#94A3B8] hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-200/80 dark:hover:bg-zinc-700 transition-colors"
-          >
-            <Paperclip className="w-3.5 h-3.5" />
-          </button>
-
-          {/* Hidden file input for attachment */}
-          <input
-            type="file"
-            ref={fileInputRef}
-            multiple
-            onChange={handleFileChange}
-            className="hidden"
-            aria-hidden="true"
-          />
-
-          {/* Delete */}
-          <button
-            onClick={() => onRequestDeleteNode(node.id, true)}
-            title="Delete item"
-            className="p-1 rounded text-[#64748B] dark:text-[#94A3B8] hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
-        </div>
+        {/* Quick Actions */}
+        <TreeNodeActions
+          nodeId={node.id}
+          onMoveUp={onMoveUp}
+          onMoveDown={onMoveDown}
+          onAddChild={onAddChild}
+          onRequestDeleteNode={(id) => onRequestDeleteNode(id, true)}
+          onAttachClick={handleAttachClick}
+          fileInputRef={fileInputRef}
+          onFileChange={handleFileChange}
+        />
       </div>
 
-      {/* Children Nodes (if not collapsed) with Guide Line */}
-      {hasChildren && !node.isCollapsed && (
+      {/* Children Nodes (if not collapsed and recursive rendering enabled) with Guide Line */}
+      {renderChildren && hasChildren && !node.isCollapsed && (
         <div role="group" className="ml-4 sm:ml-5 pl-2 border-l border-[#E2E8F0] dark:border-[#27272A] space-y-0.5">
           {node.childrenIds.map((childId) => (
             <TreeNodeItem
@@ -317,7 +273,6 @@ export const TreeNodeItem: React.FC<TreeNodeItemProps> = React.memo(({
               onNavigateDown={onNavigateDown}
               onNavigateToWikilink={onNavigateToWikilink}
               onToggleCollapse={onToggleCollapse}
-              onToggleComplete={onToggleComplete}
               onZoomIn={onZoomIn}
               onSetActiveId={onSetActiveId}
               onSelectTag={onSelectTag}

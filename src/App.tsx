@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useTreeDocument } from './hooks/useTreeDocument'
 import { useNotebooks } from './hooks/useNotebooks'
 import { useTheme } from './hooks/useTheme'
@@ -6,30 +6,17 @@ import { useLocalVault } from './hooks/useLocalVault'
 import { useModals } from './hooks/useModals'
 import { useGlobalKeyboard } from './hooks/useGlobalKeyboard'
 import { useGlobalPaste } from './hooks/useGlobalPaste'
+import { useAppInstallPrompt } from './hooks/useAppInstallPrompt'
+import { useWebShareTarget } from './hooks/useWebShareTarget'
+import { useAppRouting } from './hooks/useAppRouting'
 import { Navbar } from './components/layout/Navbar'
 import { Sidebar } from './components/sidebar/Sidebar'
 import { TreeView } from './components/tree/TreeView'
 import { MobileToolbar } from './components/tree/MobileToolbar'
 import { LandingPage } from './components/landing/LandingPage'
+import { AppModals } from './components/modals/AppModals'
 import { ToastContainer } from './components/ui/Toast'
-import { Loader2, PanelLeft } from 'lucide-react'
-
-// Code splitting: Heavy modals loaded asynchronously on demand
-const ExportImportModal = lazy(() =>
-  import('./components/modals/ExportImportModal').then((m) => ({ default: m.ExportImportModal }))
-)
-const ShortcutsModal = lazy(() =>
-  import('./components/modals/ShortcutsModal').then((m) => ({ default: m.ShortcutsModal }))
-)
-const ConfirmDeleteModal = lazy(() =>
-  import('./components/modals/ConfirmDeleteModal').then((m) => ({ default: m.ConfirmDeleteModal }))
-)
-const TrashModal = lazy(() =>
-  import('./components/modals/TrashModal').then((m) => ({ default: m.TrashModal }))
-)
-const LocalVaultModal = lazy(() =>
-  import('./components/modals/LocalVaultModal').then((m) => ({ default: m.LocalVaultModal }))
-)
+import { Loader2 } from 'lucide-react'
 
 export function App() {
   const {
@@ -43,13 +30,14 @@ export function App() {
     setActiveEditingId, updateTitle, updateContent, updateNote,
     addSibling, addChild, deleteNode, restoreFromTrash,
     permanentlyDeleteTrash, emptyTrash, indentNode, outdentNode,
-    moveNode, toggleCollapse, collapseAll, expandAll, toggleComplete, zoomToNode,
+    moveNode, toggleCollapse, collapseAll, expandAll, zoomToNode,
     zoomOut, replaceDocument,
   } = useTreeDocument(activeNotebookId)
 
   const vault = useLocalVault(doc)
   const { isDark, toggleTheme } = useTheme()
   const modals = useModals()
+  const { canInstall, handleInstallApp } = useAppInstallPrompt()
 
   const [tagSearchQuery, setTagSearchQuery] = useState<string | null>(null)
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
@@ -57,27 +45,10 @@ export function App() {
     return window.innerWidth >= 1024
   })
 
-  const isPwa = useMemo(() => {
-    if (typeof window === 'undefined') return false
-    return (
-      window.matchMedia('(display-mode: standalone)').matches ||
-      (window.navigator as unknown as { standalone?: boolean }).standalone === true ||
-      new URLSearchParams(window.location.search).get('source') === 'pwa'
-    )
-  }, [])
+  const { isPwa, view, openApp, goToLanding } = useAppRouting()
 
-  const [view, setView] = useState<'landing' | 'app'>(() => {
-    if (typeof window === 'undefined' || isPwa) return 'app'
-    return window.location.hash === '#app' ? 'app' : 'landing'
-  })
-
-  useEffect(() => {
-    const handleHashChange = () => {
-      if (!isPwa) setView(window.location.hash === '#app' ? 'app' : 'landing')
-    }
-    window.addEventListener('hashchange', handleHashChange)
-    return () => window.removeEventListener('hashchange', handleHashChange)
-  }, [isPwa])
+  // Web Share Target & Quick Shortcut URL handler
+  useWebShareTarget(isLoaded, focusedNodeId, doc.rootId, addChild, setActiveEditingId)
 
   // Responsive sidebar viewport listener
   useEffect(() => {
@@ -150,18 +121,34 @@ export function App() {
     onAddChild: addChild,
   })
 
+  const renderedModals = (
+    <AppModals
+      modals={modals}
+      doc={doc}
+      isDark={isDark}
+      trashItems={trashItems}
+      deleteNode={deleteNode}
+      restoreFromTrash={restoreFromTrash}
+      permanentlyDeleteTrash={permanentlyDeleteTrash}
+      emptyTrash={emptyTrash}
+      replaceDocument={replaceDocument}
+      createNotebookWithDoc={createNotebookWithDoc}
+      vault={vault}
+      handleSelectNode={handleSelectNode}
+      setTagSearchQuery={setTagSearchQuery}
+    />
+  )
+
   if (!isPwa && view === 'landing') {
     return (
       <>
         <LandingPage
-          onOpenApp={() => { setView('app'); window.location.hash = '#app' }}
+          onOpenApp={openApp}
           onOpenShortcuts={() => modals.setIsShortcutsOpen(true)}
           isDark={isDark}
           onToggleTheme={toggleTheme}
         />
-        <Suspense fallback={null}>
-          <ShortcutsModal isOpen={modals.isShortcutsOpen} onClose={() => modals.setIsShortcutsOpen(false)} />
-        </Suspense>
+        {renderedModals}
       </>
     )
   }
@@ -198,7 +185,7 @@ export function App() {
         onOpenExportImport={() => modals.setIsExportOpen(true)}
         onOpenShortcuts={() => modals.setIsShortcutsOpen(true)}
         onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
-        onGoToLanding={!isPwa ? () => { setView('landing'); window.location.hash = '' } : undefined}
+        onGoToLanding={!isPwa ? goToLanding : undefined}
         searchQuery={tagSearchQuery}
         onClearSearchQuery={() => setTagSearchQuery(null)}
         onCollapseAll={() => handleCollapseAll(focusedNodeId)}
@@ -206,6 +193,9 @@ export function App() {
         onOpenVault={() => modals.setIsVaultOpen(true)}
         isVaultConnected={vault.isConnected}
         vaultFolderName={vault.folderName}
+        onInstallApp={handleInstallApp}
+        canInstall={canInstall}
+        onOpenGraph={() => modals.setIsGraphOpen(true)}
       />
 
       <div className="relative flex-1 h-[calc(100vh-52px)] flex overflow-hidden">
@@ -238,17 +228,14 @@ export function App() {
         </div>
 
         <div className="relative flex-1 h-full flex flex-col min-w-0 overflow-y-auto bg-white dark:bg-[#09090B]">
-          {!isSidebarOpen && (
-            <button
-              onClick={() => setIsSidebarOpen(true)}
-              title="Open Tree Map"
-              className="hidden lg:flex absolute top-4 left-4 z-20 w-8 h-8 items-center justify-center rounded-lg bg-white dark:bg-zinc-800 border border-[#E2E8F0] dark:border-[#27272A] text-[#64748B] dark:text-[#94A3B8] hover:text-[#0F172A] dark:hover:text-white hover:bg-slate-50 dark:hover:bg-zinc-700 shadow-2xs transition-all duration-200"
-            >
-              <PanelLeft className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-            </button>
-          )}
-
-          <main className="flex-1 pb-28 sm:pb-24 flex flex-col">
+          <main
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setActiveEditingId(null)
+              }
+            }}
+            className="flex-1 pb-28 sm:pb-24 flex flex-col"
+          >
             <TreeView
               doc={doc}
               focusedNodeId={focusedNodeId}
@@ -263,7 +250,6 @@ export function App() {
               onMoveUp={handleMoveUp}
               onMoveDown={handleMoveDown}
               onToggleCollapse={toggleCollapse}
-              onToggleComplete={toggleComplete}
               onZoomIn={zoomToNode}
               onZoomOut={zoomOut}
               onSetActiveId={setActiveEditingId}
@@ -293,64 +279,11 @@ export function App() {
         onMoveDown={handleMoveDown}
         onAddChild={addChild}
         onAddSibling={addSibling}
-        onToggleComplete={toggleComplete}
         onDelete={(id) => handleRequestDeleteNode(id, true)}
         onClose={() => setActiveEditingId(null)}
       />
 
-      {/* Lazy Modals with Suspense */}
-      <Suspense fallback={null}>
-        {modals.nodeToDelete && (
-          <ConfirmDeleteModal
-            isOpen={Boolean(modals.nodeToDelete)}
-            onClose={() => modals.setNodeToDelete(null)}
-            onConfirm={(dontAskToday) => modals.confirmDelete(dontAskToday, deleteNode)}
-            nodeContent={modals.nodeToDelete.content}
-            childCount={modals.nodeToDelete.childCount}
-          />
-        )}
-        {modals.isTrashOpen && (
-          <TrashModal
-            isOpen={modals.isTrashOpen}
-            onClose={() => modals.setIsTrashOpen(false)}
-            items={trashItems}
-            onRestore={restoreFromTrash}
-            onPermanentDelete={permanentlyDeleteTrash}
-            onEmptyTrash={emptyTrash}
-          />
-        )}
-        {modals.isExportOpen && (
-          <ExportImportModal
-            isOpen={modals.isExportOpen}
-            onClose={() => modals.setIsExportOpen(false)}
-            doc={doc}
-            onImportDocument={replaceDocument}
-            onImportAsNewNotebook={createNotebookWithDoc}
-          />
-        )}
-        {modals.isVaultOpen && (
-          <LocalVaultModal
-            isOpen={modals.isVaultOpen}
-            onClose={() => modals.setIsVaultOpen(false)}
-            isSupported={vault.isSupported}
-            isConnected={vault.isConnected}
-            folderName={vault.folderName}
-            autoSync={vault.autoSync}
-            isSyncing={vault.isSyncing}
-            lastSyncedAt={vault.lastSyncedAt}
-            onConnect={vault.connectVault}
-            onDisconnect={vault.disconnectVault}
-            onSyncNow={vault.syncNow}
-            onToggleAutoSync={vault.toggleAutoSync}
-          />
-        )}
-        {modals.isShortcutsOpen && (
-          <ShortcutsModal
-            isOpen={modals.isShortcutsOpen}
-            onClose={() => modals.setIsShortcutsOpen(false)}
-          />
-        )}
-      </Suspense>
+      {renderedModals}
 
       {/* Global Toast Notification Container */}
       <ToastContainer />

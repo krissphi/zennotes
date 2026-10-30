@@ -1,30 +1,20 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { TreeDocument } from '../core/models/TreeDocument'
-import { TreeNode, type TreeNodeData } from '../core/models/TreeNode'
+import type { TreeNode } from '../core/models/TreeNode'
 import { IndexedDBStorageService } from '../core/services/IndexedDBStorageService'
-import { TrashStorageService } from '../core/services/TrashStorageService'
 import { NotebookRegistryService } from '../core/services/NotebookRegistryService'
 import { BlobStorageService } from '../core/services/BlobStorageService'
 import { useDocumentHistory } from './useDocumentHistory'
-import type { TrashItem } from '../core/models/TrashItem'
-import { getNodeDisplayText } from '../lib/attachmentUtils'
+import { useTreePersistence } from './useTreePersistence'
+import { useTreeTrash } from './useTreeTrash'
 
 export function useTreeDocument(notebookId = 'default') {
   const [doc, setDoc] = useState<TreeDocument>(() => TreeDocument.createDefault())
   const [focusedNodeId, setFocusedNodeId] = useState<string>('root')
   const [activeEditingId, setActiveEditingId] = useState<string | null>(null)
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved')
   const [isLoaded, setIsLoaded] = useState(false)
-  const [trashItems, setTrashItems] = useState<TrashItem[]>([])
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const pendingDocRef = useRef<TreeDocument | null>(null)
   const historyTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const pendingHistoryStateRef = useRef<TreeDocument | null>(null)
-
-  // Isolated storage service reference locked to the active notebook
-  const activeStorageServiceRef = useRef<IndexedDBStorageService>(
-    new IndexedDBStorageService(NotebookRegistryService.getStorageKey(notebookId))
-  )
 
   const history = useDocumentHistory()
   const { pushState, resetHistory } = history
@@ -41,60 +31,19 @@ export function useTreeDocument(notebookId = 'default') {
     }
   }, [pushState])
 
-  // Flush pending save immediately
-  const flushSave = useCallback(async () => {
-    flushHistory()
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current)
-      saveTimeoutRef.current = null
-    }
-    if (!pendingDocRef.current) return
-    const docToSave = pendingDocRef.current
-    pendingDocRef.current = null
-    const storageService = activeStorageServiceRef.current
-    try {
-      await storageService.saveDocument(docToSave.toJSON())
-      setSaveStatus('saved')
-    } catch (e) {
-      console.error('Save failed:', e)
-      setSaveStatus('error')
-    }
-  }, [flushHistory])
-
-  // Stable ref for flushSave to prevent infinite render loops in effects
-  const flushSaveRef = useRef(flushSave)
-  useEffect(() => {
-    flushSaveRef.current = flushSave
-  })
-
-  // Auto-save with debounce
-  const triggerAutoSave = useCallback((newDoc: TreeDocument) => {
-    pendingDocRef.current = newDoc
-    setSaveStatus('saving')
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
-    saveTimeoutRef.current = setTimeout(() => { flushSave() }, 600)
-  }, [flushSave])
-
-  // Life-cycle listeners
-  useEffect(() => {
-    const handleBeforeUnload = () => { flushSaveRef.current() }
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') flushSaveRef.current()
-    }
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload)
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-    }
-  }, [])
+  const {
+    saveStatus,
+    triggerAutoSave,
+    flushSave,
+    activeStorageServiceRef,
+  } = useTreePersistence(notebookId, flushHistory, setDoc)
 
   // Load from IndexedDB on notebookId change ONLY
   useEffect(() => {
     let isCancelled = false
     async function loadData() {
       // Flush any pending save to the PREVIOUS storage instance before switching
-      await flushSaveRef.current()
+      await flushSave()
       if (isCancelled) return
 
       setIsLoaded(false)
@@ -116,9 +65,6 @@ export function useTreeDocument(notebookId = 'default') {
           setFocusedNodeId(freshDoc.rootId)
           resetHistory(freshDoc.toJSON())
         }
-        const loadedTrash = await TrashStorageService.loadTrash(notebookId)
-        if (isCancelled) return
-        setTrashItems(loadedTrash)
       } catch (err) {
         console.error('Error loading data:', err)
       } finally {
@@ -172,6 +118,37 @@ export function useTreeDocument(notebookId = 'default') {
     [triggerAutoSave, pushState, flushHistory]
   )
 
+  /**
+   * Granular mutation with structural sharing (O(1) node clone instead of O(N) full tree clone).
+   * Prevents full tree cloning and massive GC spikes on frequent operations like typing.
+   */
+  const mutateSingleNode = useCallback(
+    (
+      nodeId: string,
+      updater: (node: TreeNode) => void,
+      isTextEdit = false
+    ) => {
+      setDoc((prev) => {
+        const cloned = prev.cloneWithNodeUpdate(nodeId, updater)
+
+        if (isTextEdit) {
+          pendingHistoryStateRef.current = cloned
+          if (historyTimeoutRef.current) clearTimeout(historyTimeoutRef.current)
+          historyTimeoutRef.current = setTimeout(() => {
+            flushHistory()
+          }, 800)
+        } else {
+          flushHistory()
+          pushState(cloned.toJSON())
+        }
+
+        triggerAutoSave(cloned)
+        return cloned
+      })
+    },
+    [triggerAutoSave, pushState, flushHistory]
+  )
+
   const undo = useCallback(() => {
     flushHistory()
     const prevState = history.undo()
@@ -197,12 +174,12 @@ export function useTreeDocument(notebookId = 'default') {
   }, [mutateDoc])
 
   const updateContent = useCallback((nodeId: string, content: string) => {
-    mutateDoc((cloned) => { cloned.getNode(nodeId)?.setContent(content) }, undefined, true)
-  }, [mutateDoc])
+    mutateSingleNode(nodeId, (node) => node.setContent(content), true)
+  }, [mutateSingleNode])
 
   const updateNote = useCallback((nodeId: string, note: string) => {
-    mutateDoc((cloned) => { cloned.getNode(nodeId)?.setNote(note) }, undefined, true)
-  }, [mutateDoc])
+    mutateSingleNode(nodeId, (node) => node.setNote(note), true)
+  }, [mutateSingleNode])
 
   const addSibling = useCallback((refId: string, content = '') => {
     let createdId: string | null = null
@@ -218,88 +195,20 @@ export function useTreeDocument(notebookId = 'default') {
     return createdId
   }, [mutateDoc])
 
-  const deleteNode = useCallback((nodeId: string, permanent = false) => {
-    const node = doc.getNode(nodeId)
-    if (node && nodeId !== doc.rootId) {
-      const descendants = doc.getDescendantIds(nodeId)
-        .map((dId) => doc.getNode(dId)?.toJSON())
-        .filter((d): d is TreeNodeData => Boolean(d))
-
-      if (!permanent) {
-        TrashStorageService.addTrashItem({
-          id: `trash_${Date.now()}_${node.id}`,
-          title: getNodeDisplayText(node.content, '(Untitled item)'),
-          note: node.note,
-          notebookId,
-          originalParentId: node.parentId,
-          deletedAt: Date.now(),
-          nodeData: node.toJSON(),
-          descendants,
-        }, notebookId).then(setTrashItems)
-      } else {
-        // Direct permanent deletion: clean up any attached binary blobs immediately
-        const texts = [
-          node.content,
-          node.note || '',
-          ...descendants.map((d) => `${d.content} ${d.note || ''}`),
-        ]
-        for (const text of texts) {
-          for (const bId of BlobStorageService.extractBlobIds(text)) {
-            BlobStorageService.deleteBlob(bId).catch(() => {})
-          }
-        }
-      }
-    }
-
-    let nextFocus: string | null = null
-    mutateDoc((cloned) => { nextFocus = cloned.deleteNode(nodeId).newFocusId })
-    if (nextFocus) setActiveEditingId(nextFocus)
-  }, [doc, mutateDoc, notebookId])
-
-  const restoreFromTrash = useCallback((item: TrashItem) => {
-    mutateDoc((cloned) => {
-      cloned.insertRestoredSubtree(
-        TreeNode.fromJSON(item.nodeData),
-        item.descendants.map(TreeNode.fromJSON)
-      )
-    }, item.nodeData.id)
-    TrashStorageService.removeTrashItem(item.id, notebookId).then(setTrashItems)
-  }, [mutateDoc, notebookId])
-
-  const permanentlyDeleteTrash = useCallback(async (id: string) => {
-    const item = trashItems.find((t) => t.id === id)
-    if (item) {
-      const texts = [
-        item.nodeData.content,
-        item.nodeData.note || '',
-        ...item.descendants.map((d) => `${d.content} ${d.note || ''}`),
-      ]
-      for (const text of texts) {
-        for (const bId of BlobStorageService.extractBlobIds(text)) {
-          await BlobStorageService.deleteBlob(bId)
-        }
-      }
-    }
-    const updated = await TrashStorageService.removeTrashItem(id, notebookId)
-    setTrashItems(updated)
-  }, [notebookId, trashItems])
-
-  const emptyTrash = useCallback(async () => {
-    for (const item of trashItems) {
-      const texts = [
-        item.nodeData.content,
-        item.nodeData.note || '',
-        ...item.descendants.map((d) => `${d.content} ${d.note || ''}`),
-      ]
-      for (const text of texts) {
-        for (const bId of BlobStorageService.extractBlobIds(text)) {
-          await BlobStorageService.deleteBlob(bId)
-        }
-      }
-    }
-    await TrashStorageService.clearAll(notebookId)
-    setTrashItems([])
-  }, [notebookId, trashItems])
+  const {
+    trashItems,
+    deleteNode,
+    restoreFromTrash,
+    permanentlyDeleteTrash,
+    emptyTrash,
+  } = useTreeTrash(
+    doc,
+    notebookId,
+    mutateDoc,
+    focusedNodeId,
+    setActiveEditingId,
+    setFocusedNodeId
+  )
 
   const indentNode = useCallback((nodeId: string) => {
     mutateDoc((cloned) => { cloned.indentNode(nodeId) }, nodeId)
@@ -314,8 +223,8 @@ export function useTreeDocument(notebookId = 'default') {
   }, [mutateDoc])
 
   const toggleCollapse = useCallback((nodeId: string) => {
-    mutateDoc((cloned) => { cloned.getNode(nodeId)?.toggleCollapse() })
-  }, [mutateDoc])
+    mutateSingleNode(nodeId, (node) => node.toggleCollapse())
+  }, [mutateSingleNode])
 
   const collapseAll = useCallback((fromNodeId?: string) => {
     mutateDoc((cloned) => { cloned.collapseAll(fromNodeId) })
@@ -323,10 +232,6 @@ export function useTreeDocument(notebookId = 'default') {
 
   const expandAll = useCallback((fromNodeId?: string) => {
     mutateDoc((cloned) => { cloned.expandAll(fromNodeId) })
-  }, [mutateDoc])
-
-  const toggleComplete = useCallback((nodeId: string) => {
-    mutateDoc((cloned) => { cloned.getNode(nodeId)?.toggleComplete() })
   }, [mutateDoc])
 
   const zoomToNode = useCallback((nodeId: string) => { setFocusedNodeId(nodeId) }, [])
@@ -373,7 +278,6 @@ export function useTreeDocument(notebookId = 'default') {
     toggleCollapse,
     collapseAll,
     expandAll,
-    toggleComplete,
     zoomToNode,
     zoomOut,
     replaceDocument,

@@ -1,4 +1,6 @@
 import { TreeNode, type TreeNodeData } from './TreeNode'
+import { TreeOperations } from './TreeOperations'
+import { createDefaultNodes } from './defaultDocument'
 
 export interface TreeDocumentData {
   title: string
@@ -150,97 +152,26 @@ export class TreeDocument {
   }
 
   public indentNode(nodeId: string): boolean {
-    const node = this.nodes.get(nodeId)
-    if (!node || !node.parentId || nodeId === this.rootId) return false
-
-    const parent = this.nodes.get(node.parentId)
-    if (!parent) return false
-
-    const index = parent.childrenIds.indexOf(nodeId)
-    if (index <= 0) return false // Cannot indent the first sibling
-
-    const prevSiblingId = parent.childrenIds[index - 1]
-    const prevSibling = this.nodes.get(prevSiblingId)
-    if (!prevSibling) return false
-
-    // Move node to be child of previous sibling
-    parent.removeChild(nodeId)
-    node.parentId = prevSiblingId
-    prevSibling.addChild(nodeId)
-    prevSibling.setCollapsed(false)
-    return true
+    return TreeOperations.indentNode(this.nodes, this.rootId, nodeId)
   }
 
   public outdentNode(nodeId: string): boolean {
-    const node = this.nodes.get(nodeId)
-    if (!node || !node.parentId || nodeId === this.rootId) return false
-
-    const parent = this.nodes.get(node.parentId)
-    if (!parent || !parent.parentId) return false // Already at top level under root
-
-    const grandParent = this.nodes.get(parent.parentId)
-    if (!grandParent) return false
-
-    const parentIndex = grandParent.childrenIds.indexOf(parent.id)
-    parent.removeChild(nodeId)
-    node.parentId = grandParent.id
-    grandParent.addChild(nodeId, parentIndex + 1)
-    return true
+    return TreeOperations.outdentNode(this.nodes, this.rootId, nodeId)
   }
 
   public moveNode(nodeId: string, direction: 'up' | 'down'): boolean {
-    const node = this.nodes.get(nodeId)
-    if (!node || !node.parentId) return false
-
-    const parent = this.nodes.get(node.parentId)
-    if (!parent) return false
-
-    const index = parent.childrenIds.indexOf(nodeId)
-    if (index === -1) return false
-
-    if (direction === 'up' && index > 0) {
-      const temp = parent.childrenIds[index - 1]
-      parent.childrenIds[index - 1] = nodeId
-      parent.childrenIds[index] = temp
-      parent.touch()
-      return true
-    } else if (direction === 'down' && index < parent.childrenIds.length - 1) {
-      const temp = parent.childrenIds[index + 1]
-      parent.childrenIds[index + 1] = nodeId
-      parent.childrenIds[index] = temp
-      parent.touch()
-      return true
-    }
-    return false
+    return TreeOperations.moveNode(this.nodes, nodeId, direction)
   }
 
   public reorderNode(draggedId: string, targetId: string, position: 'before' | 'after'): boolean {
-    if (draggedId === targetId || draggedId === this.rootId) return false
-    const draggedNode = this.nodes.get(draggedId)
-    const targetNode = this.nodes.get(targetId)
-    if (!draggedNode || !targetNode || !draggedNode.parentId || !targetNode.parentId) return false
-
-    // Prevent dragging a node into its own descendants
-    const descendants = this.getDescendantIds(draggedId)
-    if (descendants.includes(targetId)) return false
-
-    const oldParent = this.nodes.get(draggedNode.parentId)
-    const newParent = this.nodes.get(targetNode.parentId)
-    if (!oldParent || !newParent) return false
-
-    // Remove from old parent
-    oldParent.removeChild(draggedId)
-
-    // Calculate insertion index in new parent
-    const targetIndex = newParent.childrenIds.indexOf(targetId)
-    const insertIndex = position === 'after' ? targetIndex + 1 : targetIndex
-
-    draggedNode.parentId = newParent.id
-    newParent.addChild(draggedId, insertIndex)
-
-    oldParent.touch()
-    newParent.touch()
-    return true
+    return TreeOperations.reorderNode(
+      this.nodes,
+      this.rootId,
+      (id) => this.getDescendantIds(id),
+      draggedId,
+      targetId,
+      position
+    )
   }
 
   public getBreadcrumbs(targetId: string): TreeNode[] {
@@ -280,35 +211,51 @@ export class TreeDocument {
   }
 
   public collapseAll(fromNodeId?: string): void {
-    const targetNodeId = fromNodeId || this.rootId
-    const nodeIds = targetNodeId === this.rootId
-      ? Array.from(this.nodes.keys())
-      : [targetNodeId, ...this.getDescendantIds(targetNodeId)]
-
-    nodeIds.forEach((id) => {
-      if (id !== this.rootId) {
-        const node = this.nodes.get(id)
-        if (node && node.hasChildren()) {
-          node.isCollapsed = true
-          node.touch()
-        }
-      }
-    })
+    TreeOperations.collapseAll(this.nodes, this.rootId, (id) => this.getDescendantIds(id), fromNodeId)
   }
 
   public expandAll(fromNodeId?: string): void {
-    const targetNodeId = fromNodeId || this.rootId
-    const nodeIds = targetNodeId === this.rootId
-      ? Array.from(this.nodes.keys())
-      : [targetNodeId, ...this.getDescendantIds(targetNodeId)]
+    TreeOperations.expandAll(this.nodes, this.rootId, (id) => this.getDescendantIds(id), fromNodeId)
+  }
 
-    nodeIds.forEach((id) => {
-      const node = this.nodes.get(id)
-      if (node && node.hasChildren()) {
-        node.isCollapsed = false
-        node.touch()
+  /**
+   * Fine-grained mutation with structural sharing (O(1) node clone instead of O(N) full tree clone).
+   * Creates a shallow copy of the Map and clones only the specified node.
+   * Unchanged nodes retain reference identity, eliminating massive GC and CPU overhead in large trees.
+   */
+  public cloneWithNodeUpdate(nodeId: string, updater: (node: TreeNode) => void): TreeDocument {
+    const targetNode = this.nodes.get(nodeId)
+    if (!targetNode) return this
+
+    const clonedMap = new Map<string, TreeNode>(this.nodes)
+    const clonedTarget = targetNode.clone()
+    updater(clonedTarget)
+    clonedMap.set(nodeId, clonedTarget)
+
+    const newDoc = new TreeDocument(this.title, this.rootId, clonedMap)
+    newDoc.wikilinkMapCache = null
+    return newDoc
+  }
+
+  /**
+   * Fine-grained batch mutation with structural sharing for a specific list of node IDs.
+   */
+  public cloneWithNodesUpdate(
+    nodeIds: string[],
+    updater: (node: TreeNode) => void
+  ): TreeDocument {
+    const clonedMap = new Map<string, TreeNode>(this.nodes)
+    for (const id of nodeIds) {
+      const node = clonedMap.get(id)
+      if (node) {
+        const clonedNode = node.clone()
+        updater(clonedNode)
+        clonedMap.set(id, clonedNode)
       }
-    })
+    }
+    const newDoc = new TreeDocument(this.title, this.rootId, clonedMap)
+    newDoc.wikilinkMapCache = null
+    return newDoc
   }
 
   public clone(): TreeDocument {
@@ -341,44 +288,7 @@ export class TreeDocument {
   }
 
   public static createDefault(): TreeDocument {
-    const root = new TreeNode({ id: 'root', content: 'Main Notes', parentId: null })
-    const n1 = new TreeNode({ id: 'n1', content: 'Welcome to ZenNotes', parentId: 'root' })
-    const n1_1 = new TreeNode({
-      id: 'n1_1',
-      content: 'A deep tree outliner for structured thinking without boundaries.',
-      parentId: 'n1',
-    })
-    const n1_1_1 = new TreeNode({
-      id: 'n1_1_1',
-      content: 'Nest branches as deeply as your thoughts require.',
-      parentId: 'n1_1',
-    })
-    const n2 = new TreeNode({ id: 'n2', content: 'Quick Keyboard Shortcuts:', parentId: 'root' })
-    const n2_1 = new TreeNode({ id: 'n2_1', content: 'Enter: Create new item', parentId: 'n2' })
-    const n2_2 = new TreeNode({ id: 'n2_2', content: 'Tab: Indent item one level deeper', parentId: 'n2' })
-    const n2_3 = new TreeNode({ id: 'n2_3', content: 'Shift + Tab: Outdent item one level back', parentId: 'n2' })
-    const n2_4 = new TreeNode({ id: 'n2_4', content: 'Alt + Up / Down: Reorder items', parentId: 'n2' })
-    const n3 = new TreeNode({
-      id: 'n3',
-      content: 'Click the bullet point to zoom in (hoist) into any branch.',
-      parentId: 'root',
-    })
-    const n4 = new TreeNode({
-      id: 'n4',
-      content: '```bash\n# Code snippet with copy button\npnpm dev\n```',
-      parentId: 'root',
-    })
-
-    root.childrenIds = ['n1', 'n2', 'n3', 'n4']
-    n1.childrenIds = ['n1_1']
-    n1_1.childrenIds = ['n1_1_1']
-    n2.childrenIds = ['n2_1', 'n2_2', 'n2_3', 'n2_4']
-
-    const map = new Map<string, TreeNode>()
-    ;[root, n1, n1_1, n1_1_1, n2, n2_1, n2_2, n2_3, n2_4, n3, n4].forEach((node) => {
-      map.set(node.id, node)
-    })
-
-    return new TreeDocument('My Workspace', 'root', map)
+    const { title, rootId, nodes } = createDefaultNodes()
+    return new TreeDocument(title, rootId, nodes)
   }
 }

@@ -72,11 +72,6 @@ export class TreeNode {
     this.touch()
   }
 
-  public toggleComplete(): void {
-    this.isCompleted = !this.isCompleted
-    this.touch()
-  }
-
   public hasChildren(): boolean {
     return this.childrenIds.length > 0
   }

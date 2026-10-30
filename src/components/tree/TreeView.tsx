@@ -1,12 +1,10 @@
-import React, { useState, useMemo, useCallback } from 'react'
+import React, { useMemo, useCallback } from 'react'
 import { Plus, Paperclip, Zap } from 'lucide-react'
 import { TreeNodeItem } from './TreeNodeItem'
 import { BranchHeader } from './BranchHeader'
 import type { TreeDocument } from '../../core/models/TreeDocument'
-import { processImageFile } from '../../lib/imageUtils'
-import { hasFiles, getAllFiles, processAttachmentFile } from '../../lib/attachmentUtils'
 import { useVirtualList } from '../../hooks/useVirtualList'
-import { toast } from '../../lib/toast'
+import { useTreeCanvasDrop } from './useTreeCanvasDrop'
 
 interface TreeViewProps {
   doc: TreeDocument
@@ -22,10 +20,9 @@ interface TreeViewProps {
   onMoveUp: (id: string) => void
   onMoveDown: (id: string) => void
   onToggleCollapse: (id: string) => void
-  onToggleComplete: (id: string) => void
   onZoomIn: (id: string) => void
   onZoomOut?: () => void
-  onSetActiveId: (id: string) => void
+  onSetActiveId: (id: string | null) => void
   onNavigateToWikilink?: (title: string) => void
   onSelectTag?: (tag: string) => void
   onCollapseAll?: (fromNodeId?: string) => void
@@ -46,7 +43,6 @@ export const TreeView: React.FC<TreeViewProps> = ({
   onMoveUp,
   onMoveDown,
   onToggleCollapse,
-  onToggleComplete,
   onZoomIn,
   onZoomOut,
   onSetActiveId,
@@ -59,28 +55,35 @@ export const TreeView: React.FC<TreeViewProps> = ({
   const isRoot = focusedNode.id === doc.rootId
   const childrenIds = focusedNode.childrenIds
 
-  // Virtualization windowing for branches with > 40 items
-  const { containerRef, totalHeight, virtualRows, measureElement, isVirtualActive } = useVirtualList({
-    itemCount: childrenIds.length,
-    estimateHeight: 38,
-    overscan: 10,
-  })
-
-  // Compute all currently visible (uncollapsed) node IDs in top-to-bottom order for arrow-key navigation
-  const visibleNodeIds = useMemo(() => {
-    const list: string[] = []
-    const traverse = (nodeId: string) => {
+  // Compute all currently visible (uncollapsed) nodes in pre-order traversal with depth for scaling to 20,000+ nodes
+  const visibleNodes = useMemo(() => {
+    const list: Array<{ id: string; depth: number }> = []
+    const traverse = (nodeId: string, depth: number) => {
       const node = doc.getNode(nodeId)
       if (!node) return
-      list.push(nodeId)
+      list.push({ id: nodeId, depth })
       if (!node.isCollapsed && node.childrenIds.length > 0) {
-        node.childrenIds.forEach(traverse)
+        for (const childId of node.childrenIds) {
+          traverse(childId, depth + 1)
+        }
       }
     }
     const startNode = doc.getNode(focusedNodeId) || doc.getRootNode()
-    startNode.childrenIds.forEach(traverse)
+    for (const childId of startNode.childrenIds) {
+      traverse(childId, 1)
+    }
     return list
   }, [doc, focusedNodeId])
+
+  const visibleNodeIds = useMemo(() => visibleNodes.map((n) => n.id), [visibleNodes])
+
+  // Flattened Virtual Tree windowing for branches with > 40 visible items
+  const { containerRef, totalHeight, virtualRows, measureElement, isVirtualActive } = useVirtualList({
+    itemCount: visibleNodes.length,
+    estimateHeight: 38,
+    overscan: 12,
+    resetKey: `${focusedNodeId}-${visibleNodes.length}`,
+  })
 
   const handleNavigateUp = useCallback((currentId: string) => {
     const idx = visibleNodeIds.indexOf(currentId)
@@ -96,48 +99,20 @@ export const TreeView: React.FC<TreeViewProps> = ({
     }
   }, [visibleNodeIds, onSetActiveId])
 
-  const [isCanvasDragOver, setIsCanvasDragOver] = useState(false)
-
-  const handleCanvasDragOver = (e: React.DragEvent) => {
-    if (hasFiles(e)) {
-      e.preventDefault()
-      setIsCanvasDragOver(true)
-    }
-  }
-
-  const handleCanvasDragLeave = (e: React.DragEvent) => {
-    e.preventDefault()
-    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-      setIsCanvasDragOver(false)
-    }
-  }
-
-  const handleCanvasDrop = async (e: React.DragEvent) => {
-    if (!hasFiles(e)) return
-    e.preventDefault()
-    setIsCanvasDragOver(false)
-
-    const files = getAllFiles(e.dataTransfer)
-    if (files.length === 0) return
-
-    for (const f of files) {
-      try {
-        if (f.type.startsWith('image/')) {
-          const res = await processImageFile(f)
-          onAddChild(focusedNode.id, res.markdown)
-        } else {
-          const res = await processAttachmentFile(f)
-          onAddChild(focusedNode.id, res.markdown)
-        }
-      } catch (err: unknown) {
-        console.error('Failed to process dropped file:', err)
-        if (err instanceof Error) toast.error(err.message)
-      }
-    }
-  }
+  const {
+    isCanvasDragOver,
+    handleCanvasDragOver,
+    handleCanvasDragLeave,
+    handleCanvasDrop,
+  } = useTreeCanvasDrop(onAddChild, focusedNode.id)
 
   return (
     <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onSetActiveId(null)
+        }
+      }}
       onDragOver={handleCanvasDragOver}
       onDragLeave={handleCanvasDragLeave}
       onDrop={handleCanvasDrop}
@@ -176,12 +151,12 @@ export const TreeView: React.FC<TreeViewProps> = ({
         />
       )}
 
-      {/* Children list (Windowed virtual scrolling for branches > 40 items, direct render for standard branches) */}
+      {/* Children list (Flattened virtual scrolling across all expanded nodes for > 40 items, direct render for standard branches) */}
       {isVirtualActive ? (
         <div ref={containerRef} role="tree" aria-label="Notes hierarchy" className="relative w-full my-1">
           <div className="mb-2 px-2.5 py-1 inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 rounded-lg border border-emerald-200 dark:border-emerald-800/40 select-none">
             <Zap className="w-3.5 h-3.5 text-emerald-500" />
-            <span>Virtual Scrolling Active ({childrenIds.length} items)</span>
+            <span>Flattened Virtual Tree ({visibleNodes.length.toLocaleString()} nodes)</span>
           </div>
           <div
             style={{
@@ -191,10 +166,11 @@ export const TreeView: React.FC<TreeViewProps> = ({
             }}
           >
             {virtualRows.map((virtualItem) => {
-              const childId = childrenIds[virtualItem.index]
+              const item = visibleNodes[virtualItem.index]
+              if (!item) return null
               return (
                 <div
-                  key={childId}
+                  key={item.id}
                   ref={(el) => measureElement(virtualItem.index, el)}
                   style={{
                     position: 'absolute',
@@ -205,9 +181,10 @@ export const TreeView: React.FC<TreeViewProps> = ({
                   }}
                 >
                   <TreeNodeItem
-                    nodeId={childId}
+                    nodeId={item.id}
                     doc={doc}
-                    depth={1}
+                    depth={item.depth}
+                    renderChildren={false}
                     activeEditingId={activeEditingId}
                     onUpdateContent={onUpdateContent}
                     onAddSibling={onAddSibling}
@@ -220,7 +197,6 @@ export const TreeView: React.FC<TreeViewProps> = ({
                     onNavigateUp={handleNavigateUp}
                     onNavigateDown={handleNavigateDown}
                     onToggleCollapse={onToggleCollapse}
-                    onToggleComplete={onToggleComplete}
                     onZoomIn={onZoomIn}
                     onSetActiveId={onSetActiveId}
                     onNavigateToWikilink={onNavigateToWikilink}
@@ -251,7 +227,6 @@ export const TreeView: React.FC<TreeViewProps> = ({
               onNavigateUp={handleNavigateUp}
               onNavigateDown={handleNavigateDown}
               onToggleCollapse={onToggleCollapse}
-              onToggleComplete={onToggleComplete}
               onZoomIn={onZoomIn}
               onSetActiveId={onSetActiveId}
               onNavigateToWikilink={onNavigateToWikilink}

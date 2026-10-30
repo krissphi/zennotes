@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { AlertTriangle, Trash2, X } from 'lucide-react'
 
 interface ConfirmDeleteModalProps {
@@ -17,6 +17,22 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
   childCount,
 }) => {
   const [dontAskToday, setDontAskToday] = useState(false)
+
+  useEffect(() => {
+    if (!isOpen) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        onClose()
+      } else if (e.key === 'Enter') {
+        e.preventDefault()
+        onConfirm(dontAskToday)
+        onClose()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, onClose, onConfirm, dontAskToday])
 
   if (!isOpen) return null
 

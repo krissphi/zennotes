@@ -4,6 +4,7 @@ import type { TreeDocument } from '../../core/models/TreeDocument'
 import type { TreeNode } from '../../core/models/TreeNode'
 import { getNodeDisplayText, parseNodeMedia } from '../../lib/attachmentUtils'
 import { SearchIndexService } from '../../core/services/SearchIndexService'
+import { highlightMatches } from './searchHighlight'
 
 interface LiveSearchProps {
   doc: TreeDocument
@@ -30,10 +31,12 @@ export const LiveSearch: React.FC<LiveSearchProps> = ({
 
   const [prevExternalQuery, setPrevExternalQuery] = useState(externalQuery)
 
-  if (externalQuery && prevExternalQuery !== externalQuery) {
+  if (prevExternalQuery !== externalQuery) {
     setPrevExternalQuery(externalQuery)
-    setQuery(externalQuery)
-    setIsOpen(true)
+    if (externalQuery) {
+      setQuery(externalQuery)
+      setIsOpen(true)
+    }
   }
 
   useEffect(() => {
@@ -158,16 +161,18 @@ export const LiveSearch: React.FC<LiveSearchProps> = ({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!isOpen || results.length === 0) return
 
+    const safeIndex = selectedIndex >= results.length ? 0 : selectedIndex
+
     if (e.key === 'ArrowDown') {
       e.preventDefault()
-      setSelectedIndex((prev) => (prev + 1) % results.length)
+      setSelectedIndex((safeIndex + 1) % results.length)
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
-      setSelectedIndex((prev) => (prev - 1 + results.length) % results.length)
+      setSelectedIndex((safeIndex - 1 + results.length) % results.length)
     } else if (e.key === 'Enter') {
       e.preventDefault()
-      if (results[selectedIndex]) {
-        handleSelect(results[selectedIndex].id)
+      if (results[safeIndex]) {
+        handleSelect(results[safeIndex].id)
       }
     } else if (e.key === 'Escape') {
       setIsOpen(false)
@@ -247,14 +252,16 @@ export const LiveSearch: React.FC<LiveSearchProps> = ({
                   }`}
                 >
                   <div className="min-w-0 pr-2">
-                    <p className="text-[10px] text-[#64748B] dark:text-[#94A3B8] truncate mb-0.5">{pathString}</p>
+                    <p className="text-[10px] text-[#64748B] dark:text-[#94A3B8] truncate mb-0.5">
+                      {highlightMatches(pathString, query)}
+                    </p>
                     <p className="text-xs font-medium text-[#0F172A] dark:text-white truncate flex items-center gap-1.5">
                       <FileText className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                      <span>{getNodeDisplayText(node.content) || '(empty item)'}</span>
+                      <span>{highlightMatches(getNodeDisplayText(node.content) || '(empty item)', query)}</span>
                     </p>
                     {node.note && (
                       <p className="text-[10px] text-[#64748B] dark:text-[#94A3B8] italic truncate pl-4.5 mt-0.5">
-                        Note: {node.note}
+                        Note: {highlightMatches(node.note, query)}
                       </p>
                     )}
                   </div>

@@ -5,6 +5,8 @@ import {
   parseNodeMedia,
   getNodeDisplayText,
   extractBlobIdsFromText,
+  computeBlobHash,
+  processAttachmentFile,
 } from '../attachmentUtils'
 
 describe('attachmentUtils', () => {
@@ -123,5 +125,38 @@ describe('attachmentUtils', () => {
     `
     const ids = extractBlobIdsFromText(text)
     expect(ids).toEqual(['blob_12345', 'blob_67890'])
+  })
+
+  it('preserves spaces, trailing spaces, and multiline text while typing', () => {
+    // 1. Trailing space (the exact bug report: typing spacebar at end of word)
+    expect(parseNodeMedia('hello ').cleanText).toBe('hello ')
+    expect(parseNodeMedia('hello world ').cleanText).toBe('hello world ')
+
+    // 2. Spaces at start and consecutive spaces
+    expect(parseNodeMedia('   indent').cleanText).toBe('   indent')
+    expect(parseNodeMedia('multiple   spaces   inside').cleanText).toBe('multiple   spaces   inside')
+
+    // 3. Trailing spaces when media is attached
+    const withMedia = 'Caption with space \n![Photo](zenblob:blob_1)'
+    expect(parseNodeMedia(withMedia).cleanText).toBe('Caption with space ')
+  })
+
+  it('generates identical hash IDs for identical files (deduplication)', async () => {
+    const file1 = new File(['Hello World!'], 'document.txt', { type: 'text/plain' })
+    const file2 = new File(['Hello World!'], 'document.txt', { type: 'text/plain' })
+    const file3 = new File(['Different content'], 'document.txt', { type: 'text/plain' })
+
+    const hash1 = await computeBlobHash(file1)
+    const hash2 = await computeBlobHash(file2)
+    const hash3 = await computeBlobHash(file3)
+
+    // Identical content must yield identical blob hash IDs
+    expect(hash1).toBe(hash2)
+    // Different content must yield different blob hash IDs
+    expect(hash1).not.toBe(hash3)
+
+    const res1 = await processAttachmentFile(file1)
+    const res2 = await processAttachmentFile(file2)
+    expect(res1.dataUrl).toBe(res2.dataUrl)
   })
 })

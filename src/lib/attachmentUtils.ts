@@ -4,6 +4,7 @@
  */
 
 import { BlobStorageService } from '../core/services/BlobStorageService'
+import { dataUrlToBlob } from './mediaParsing'
 
 export const MAX_ATTACHMENT_SIZE_BYTES = 25 * 1024 * 1024 // 25 MB
 
@@ -15,14 +16,15 @@ export interface ProcessedAttachment {
   markdown: string
 }
 
-export interface ParsedAttachment {
-  name: string
-  dataUrl: string
-  mimeType: string
-  sizeBytes: number
-  extension: string
-  fullMatch: string
-}
+export {
+  type ParsedAttachment,
+  hasFiles,
+  getAllFiles,
+  dataUrlToBlob,
+  parseNodeMedia,
+  getNodeDisplayText,
+  extractBlobIdsFromText,
+} from './mediaParsing'
 
 export interface AttachmentCategoryInfo {
   category: 'pdf' | 'word' | 'excel' | 'powerpoint' | 'archive' | 'audio' | 'code' | 'text' | 'file'
@@ -162,6 +164,26 @@ export function getAttachmentCategory(fileName: string, mimeType = ''): Attachme
 }
 
 /**
+ * Generates a deterministic content-addressable hash ID for a blob/file using SHA-256.
+ * Identical files will always produce the exact same ID, preventing duplicate storage in IndexedDB.
+ */
+export async function computeBlobHash(blob: Blob | File): Promise<string> {
+  if (typeof crypto !== 'undefined' && crypto.subtle && typeof blob.arrayBuffer === 'function') {
+    try {
+      const buffer = await blob.arrayBuffer()
+      const hashBuffer = await crypto.subtle.digest('SHA-256', buffer)
+      const hashArray = Array.from(new Uint8Array(hashBuffer))
+      const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('')
+      return `blob_${hashHex.substring(0, 16)}`
+    } catch {
+      // Fallback below
+    }
+  }
+  const name = (blob as File).name || ''
+  return `blob_${Date.now()}_${name}_${blob.size}`
+}
+
+/**
  * Reads any File and converts it to a decoupled Markdown file attachment
  * stored safely in BlobStorageService rather than polluting document history with base64.
  */
@@ -177,7 +199,7 @@ export async function processAttachmentFile(
 
   const fileName = file.name ? file.name.trim() : 'attachment'
   const mimeType = file.type || 'application/octet-stream'
-  const id = `blob_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`
+  const id = await computeBlobHash(file)
 
   // Store actual binary blob in isolated BlobStorageService
   await BlobStorageService.saveBlob({
@@ -198,41 +220,6 @@ export async function processAttachmentFile(
     dataUrl: blobRef,
     markdown: `[${fileName}](${blobRef})`,
   }
-}
-
-/**
- * Checks if a DragEvent contains any file items
- */
-export function hasFiles(event: React.DragEvent | DragEvent): boolean {
-  if (event.dataTransfer?.types) {
-    const types = Array.from(event.dataTransfer.types)
-    return types.includes('Files')
-  }
-  return false
-}
-
-/**
- * Extracts all files from DataTransfer (drag & drop or paste)
- */
-export function getAllFiles(dataTransfer: DataTransfer | null): File[] {
-  if (!dataTransfer?.files || dataTransfer.files.length === 0) return []
-  return Array.from(dataTransfer.files)
-}
-
-/**
- * Converts a data URL to a Blob object
- */
-export function dataUrlToBlob(dataUrl: string): Blob {
-  const parts = dataUrl.split(',')
-  const header = parts[0]
-  const base64 = parts[1] || ''
-  const mime = header.match(/:(.*?);/)?.[1] || 'application/octet-stream'
-  const binaryString = atob(base64)
-  const bytes = new Uint8Array(binaryString.length)
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i)
-  }
-  return new Blob([bytes], { type: mime })
 }
 
 /**
@@ -286,128 +273,4 @@ export async function previewAttachment(dataUrlOrRef: string) {
   } catch (err) {
     console.error('Failed to preview attachment:', err)
   }
-}
-
-/**
- * Parses node content to extract both embedded images and embedded file attachments,
- * leaving only clean human text for the editor. Supports both legacy data URLs and modern decoupled zenblob references.
- */
-export function parseNodeMedia(content: string): {
-  cleanText: string
-  images: Array<{ alt: string; src: string; fullMatch: string }>
-  attachments: ParsedAttachment[]
-} {
-  const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g
-  const attachmentRegex = /(?<!!)\[([^\]]+)\]\(((?:data:|zenblob:)[^)]+)\)/g
-
-  const images: Array<{ alt: string; src: string; fullMatch: string }> = []
-  const attachments: ParsedAttachment[] = []
-
-  let imgMatch: RegExpExecArray | null
-  while ((imgMatch = imageRegex.exec(content)) !== null) {
-    images.push({
-      alt: imgMatch[1],
-      src: imgMatch[2],
-      fullMatch: imgMatch[0],
-    })
-  }
-
-  let attMatch: RegExpExecArray | null
-  while ((attMatch = attachmentRegex.exec(content)) !== null) {
-    const name = attMatch[1]
-    const dataUrl = attMatch[2]
-    let mimeType = 'application/octet-stream'
-    let sizeBytes = 0
-
-    if (dataUrl.startsWith('zenblob:')) {
-      try {
-        const qIndex = dataUrl.indexOf('?')
-        if (qIndex !== -1) {
-          const params = new URLSearchParams(dataUrl.substring(qIndex + 1))
-          sizeBytes = parseInt(params.get('size') || '0', 10)
-          mimeType = params.get('type') || 'application/octet-stream'
-        }
-      } catch {
-        // Fallback
-      }
-    } else {
-      const mimeMatch = dataUrl.match(/^data:([^;,]+)/)
-      mimeType = mimeMatch ? mimeMatch[1] : 'application/octet-stream'
-      const base64 = dataUrl.split(',')[1] || ''
-      sizeBytes = Math.floor((base64.length * 3) / 4)
-    }
-
-    const extension = name.includes('.') ? name.split('.').pop()?.toLowerCase() || '' : ''
-
-    attachments.push({
-      name,
-      dataUrl,
-      mimeType,
-      sizeBytes,
-      extension,
-      fullMatch: attMatch[0],
-    })
-  }
-
-  let cleanText = content
-  for (const img of images) {
-    cleanText = cleanText.replace(img.fullMatch, '')
-  }
-  for (const att of attachments) {
-    cleanText = cleanText.replace(att.fullMatch, '')
-  }
-
-  cleanText = cleanText
-    .split('\n')
-    .filter((line, idx, arr) => line.trim() !== '' || (idx > 0 && idx < arr.length - 1))
-    .join('\n')
-    .trim()
-
-  return { cleanText, images, attachments }
-}
-
-/**
- * Returns a clean, human-friendly display title for a node's content.
- * Automatically eliminates raw base64 data URLs from images and attachments, returning:
- * 1. The clean text / caption (if present)
- * 2. Or the image name / alt text (e.g. "screenshot")
- * 3. Or the file attachment name (e.g. "Proposal.pdf")
- * 4. Fallback string if empty
- */
-export function getNodeDisplayText(content: string, fallback = ''): string {
-  if (!content) return fallback
-
-  const { cleanText, images, attachments } = parseNodeMedia(content)
-  const trimmedClean = cleanText.trim()
-  if (trimmedClean) {
-    const firstLine = trimmedClean.split('\n')[0].trim()
-    return firstLine || fallback
-  }
-
-  if (images.length > 0) {
-    const alt = images[0].alt.trim()
-    return alt || 'Image'
-  }
-
-  if (attachments.length > 0) {
-    const name = attachments[0].name.trim()
-    return name || 'Attachment'
-  }
-
-  return fallback
-}
-
-/**
- * Extracts all unique zenblob ID references (e.g. "zenblob:blob_123?name=...") from text
- */
-export function extractBlobIdsFromText(text: string): string[] {
-  if (!text || !text.includes('zenblob:')) return []
-  const matches = text.matchAll(/zenblob:([a-zA-Z0-9_-]+)/g)
-  const ids: string[] = []
-  for (const m of matches) {
-    if (m[1] && !ids.includes(m[1])) {
-      ids.push(m[1])
-    }
-  }
-  return ids
 }

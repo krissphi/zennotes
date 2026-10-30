@@ -10,6 +10,24 @@
   "theme_color": "#059669",
   "lang": "en",
   "categories": ["productivity", "utilities", "notes"],
+  "share_target": {
+    "action": "/?source=share-target",
+    "method": "GET",
+    "params": {
+      "title": "share_title",
+      "text": "share_text",
+      "url": "share_url"
+    }
+  },
+  "shortcuts": [
+    {
+      "name": "New Note",
+      "short_name": "New Note",
+      "description": "Create a new note in ZenNotes",
+      "url": "/?action=new#app",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
   "icons": [
     {
       "src": "/icon-192.png",

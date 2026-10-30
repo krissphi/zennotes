@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { Trash2, RotateCcw, X, Clock, AlertCircle } from 'lucide-react'
 import { TrashUtils, type TrashItem } from '../../core/models/TrashItem'
 
@@ -19,6 +19,18 @@ export const TrashModal: React.FC<TrashModalProps> = ({
   onPermanentDelete,
   onEmptyTrash,
 }) => {
+  useEffect(() => {
+    if (!isOpen) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        onClose()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, onClose])
+
   if (!isOpen) return null
 
   return (

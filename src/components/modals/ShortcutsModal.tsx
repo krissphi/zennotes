@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { X, Keyboard } from 'lucide-react'
 
 interface ShortcutsModalProps {
@@ -7,6 +7,18 @@ interface ShortcutsModalProps {
 }
 
 export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose }) => {
+  useEffect(() => {
+    if (!isOpen) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        onClose()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, onClose])
+
   if (!isOpen) return null
 
   const shortcuts = [
@@ -15,7 +27,12 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose 
     { key: 'Tab', desc: 'Indent item one level deeper' },
     { key: 'Shift + Tab', desc: 'Outdent item one level outward' },
     { key: 'Backspace', desc: 'Delete item when empty' },
-    { key: 'Ctrl + Enter', desc: 'Toggle completion checkmark' },
+    { key: 'Ctrl + B', desc: 'Bold text (**bold**)' },
+    { key: 'Ctrl + I', desc: 'Italic text (*italic*)' },
+    { key: 'Ctrl + E / `', desc: 'Inline code (`code`)' },
+    { key: 'Ctrl + T / Ctrl + Shift + S', desc: 'Strikethrough (~~strike~~)' },
+    { key: 'Ctrl + K (in note)', desc: 'Insert markdown link [text](url)' },
+    { key: 'Escape', desc: 'Exit note editing to view formatted text' },
     { key: '``` or `code`', desc: 'Code block with copy button' },
     { key: 'Alt + ↑ / ↓', desc: 'Reorder item position up / down' },
     { key: 'Click Bullet', desc: 'Zoom in (hoist) into branch' },

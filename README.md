@@ -1,60 +1,70 @@
 # ZenNotes
 
-ZenNotes is a fast, local-first hierarchical tree outliner and note-taking workspace built for structuring complex thoughts with infinite depth.
+ZenNotes is a fast, local-first hierarchical tree outliner and personal knowledge workspace built for structuring thoughts with infinite depth.
 
-All notes are stored directly on your device using IndexedDB with the Persistent Storage API. No account is required, no data is sent to external servers, and the application is 100% functional offline as a Progressive Web App (PWA).
+All notes are stored directly on your device using IndexedDB with the Persistent Storage API. No account or registration is required, no data is transmitted to external servers, and the application is 100% functional offline as an installable Progressive Web App (PWA).
 
 ---
 
-## Core Concepts
+## Core Philosophy
 
-1. **Infinite Tree Hierarchy**: Organize notes in nested parent-child trees without artificial depth limits.
-2. **Bullet Zoom Focus (Hoist)**: Click any bullet point to zoom into that single branch and isolate mental clutter.
-3. **Keyboard-First Speed**: Indent, outdent, reorder, and navigate between notes entirely via keyboard shortcuts.
-4. **Local-First Privacy**: Your data never leaves your browser, ensuring complete privacy, zero telemetry, and offline resilience.
-5. **Interconnected Knowledge**: Connect thoughts across branches with bi-directional `[[Wikilinks]]` and color-coded `#tags`.
+1. **Infinite Hierarchical Outliner**: Organize notes into recursive parent-child trees without artificial depth constraints.
+2. **Bullet Zoom Focus (Hoist)**: Click any node bullet to zoom in and isolate a single branch, eliminating mental clutter.
+3. **Keyboard-First Ergonomics**: Indent, outdent, reorder, and navigate notes entirely via keyboard shortcuts.
+4. **Local Sovereignty & Privacy**: Your data never leaves your browser, ensuring zero telemetry, full privacy, and offline resilience.
+5. **Interconnected Knowledge Graph**: Connect thoughts across branches with bi-directional `[[Wikilinks]]` and color-coded `#tags`, visualized through an interactive 2D graph.
 
 ---
 
 ## Key Features
 
-- **Decoupled Blob Storage (`BlobStorageService`)**: Large attachments (PDF, DOCX, XLSX, ZIP, audio) and images are stored in a dedicated IndexedDB blob store. Notes store only lightweight references (`zenblob:...`), slashing document RAM usage by >95% and keeping Undo/Redo snappy even with hundreds of files.
-- **Fast Fuzzy Full-Text Search (MiniSearch)**: Built-in offline search engine with typo tolerance, prefix searching, and tag-boosted ranking without searching through raw base64 data.
-- **Linked References (Backlinks Pane)**: Hoisting into any branch reveals a collapsible Linked References panel displaying every other note that mentions `[[This Branch Title]]` with one-click navigation.
-- **Virtual Scrolling Windowing**: Branches with >40 items automatically activate smooth windowed virtualization, rendering thousands of nested notes at 60/120 FPS.
-- **Global Error Boundary & Emergency Backup**: Protects against unexpected runtime crashes with a recovery screen offering a one-click direct export of your data from IndexedDB.
-- **Isolated Storage Services**: Concurrent storage instances prevent race conditions when switching rapidly between notebooks.
-- **Infinite Nested Branches**: Break complex projects and thoughts down into recursive sub-items effortlessly.
-- **Bullet Zoom & Breadcrumbs**: Hoist into any node with a single click. Navigate parent levels using clean breadcrumb navigation.
-- **Local-First Persistent Storage**: Powered by IndexedDB with automatic requests for persistent browser storage, protecting your notes from browser cache cleanup.
-- **Multi-Notebook Workspace**: Create, rename, switch, and delete independent notebooks from the collapsible sidebar. Deletion includes confirmation prompts and cleans up underlying storage completely.
-- **7-Day Isolated Recycle Bin**: Deleted items are preserved in a recycle bin per notebook for 7 days before permanent removal, with full recursive sub-tree restore capabilities.
-- **Intelligent Undo/Redo (Ctrl+Z / Ctrl+Y)**: Debounced text history prevents character-by-character buffer exhaustion, while structural mutations (indent, outdent, move, delete) are recorded instantly.
-- **Tags, URLs & Interactive Bi-directional Wikilinks**:
-  - `#tags`: Automatic color-coded pill badges (`#todo`, `#important`, `#idea`, `#done`, etc.). **Clicking any tag badge immediately filters/searches all matching notes**.
-  - Web URLs: Clickable hyperlinks without interfering with text editing.
-  - `[[Wikilinks]]`: Type `[[Note Title]]` to create interactive internal links. Clicking jumps/zooms directly to the matching note or creates it automatically.
-- **Rich Media & File Attachments (Images, PDF, DOCX, XLSX, ZIP, Audio)**:
-  - **Images**: Paste screenshots or images (`Ctrl+V`), drag & drop, or attach with the paperclip button. Automatic client-side WebP compression (82% quality, max 1440px), fullscreen Lightbox viewer, zoom, copy, and download.
-  - **Documents & Files**: Store and organize any document (PDF, Word `.docx`, Excel `.xlsx`, PowerPoint `.pptx`, archives `.zip`, audio, code, and text) up to 25 MB per file directly in local IndexedDB.
-  - **Visual Attachment Cards**: Color-coded category badges with formatted file sizes (e.g. `2.4 MB PDF`, `850 KB DOCX`, `1.2 MB ZIP`).
-  - **Instant Preview & Download**: One-click in-browser PDF/document preview in a new tab, or direct download with original filename.
-  - **Paperclip File Picker & Drag-and-Drop**: Desktop hover action button to browse your filesystem, or drop files directly onto any note or the workspace canvas.
-- **Local Storage Meter (`navigator.storage.estimate`)**: Real-time minimalist meter in the sidebar displaying offline storage used vs total browser quota dynamically formatted in B, KB, MB, and GB.
-- **Local Folder Vault (File System Access API / Obsidian Sync)**: Connect a local folder on your computer to auto-sync notes as plain `.md` files on your hard drive, allowing instant interoperability with Obsidian and VS Code.
-- **Collapse All & Expand All (`Ctrl+Shift+C` / `Ctrl+Shift+E`)**: Rapidly tidy up or expand complex deeply-nested document trees in a single click or keystroke.
-- **Single-Branch Markdown Export**: In addition to full-workspace exports, download just the currently focused branch as a clean `.md` document directly from the `BranchHeader` toolbar.
-- **Terminal-Style Code Blocks & One-Click Copy**: Type ` ```lang ` to format notes into sleek terminal-style code blocks with syntax highlighting, language badges, and a copy button. Inline `code` is also supported.
-- **Instant Live Search (Ctrl+K)**: Instant keyboard-driven search matching note content, sub-notes, and breadcrumb paths with arrow-key navigation.
+### 1. Outlining & Knowledge Structuring
+- **Infinite Nested Trees**: Break down complex thoughts, projects, and outlines into recursive sub-items effortlessly.
+- **Bullet Hoisting (Zoom)**: Click any node's bullet to zoom into that sub-tree. Navigate back up using clear, clickable breadcrumbs.
+- **Pure Outliner Navigation**: Seamlessly navigate between nodes using `ArrowUp` and `ArrowDown` at text boundaries without touching the mouse.
+- **Collapse All & Expand All (`Ctrl+Shift+C` / `Ctrl+Shift+E`)**: Instantly fold or unfold deep document branches from the navigation bar or via keyboard shortcuts.
+
+### 2. Interactive Graph View (2D Idea Map)
+- **Force-Directed Network Visualization**: Explore relationships between thoughts across your notebook via `#tags` and `[[wikilinks]]`.
+- **Direct Navigation**: Click any node in the graph to instantly jump to and focus that note in your outliner.
+- **Interactive Controls**: Smooth drag-and-drop node physics, zoom, pan, and real-time node count statistics without external heavyweight canvas dependencies.
+
+### 3. Smart Formatting & Code Blocks
+- **Inline Formatting Shortcuts**:
+  - `Ctrl + B`: Bold text (`**bold**`)
+  - `Ctrl + I`: Italic text (`*italic*`)
+  - `Ctrl + E`: Inline code (`` `code` ``)
+  - `Ctrl + T` / `Ctrl + Shift + S`: Strikethrough (`~~strike~~`)
+  - `Ctrl + K` (inside note): Insert markdown link (`[text](url)`)
+  - Smart wrapping detects selection or current word boundaries automatically without corrupting markdown asterisks.
+- **Terminal-Style Code Blocks**: Type ` ```lang ` to format notes into syntax-highlighted code blocks with language indicators and a one-click copy button.
+
+### 4. Search & Interconnected Links
+- **Fast Fuzzy Full-Text Search (MiniSearch)**: Built-in local search engine featuring prefix searching, typo tolerance, and keyword highlighting (`<mark>`) across titles, content, and sub-notes.
+- **Color-Coded `#tags`**: Automatic pill badges (`#todo`, `#idea`, `#important`, `#dev`, etc.). Clicking any tag instantly filters and highlights all matching notes.
+- **Bi-directional `[[Wikilinks]]` & Backlinks**: Connect related notes using `[[Note Title]]`. Zooming into any branch reveals a Linked References panel showing every other note referencing it.
+
+### 5. Attachments & Decoupled Blob Storage
+- **Dedicated Blob Storage (`BlobStorageService`)**: Images, documents, PDFs, and media are stored in a dedicated IndexedDB blob store. Notes retain only lightweight references (`zenblob:...`), slashing RAM usage by >95% and preserving instant Undo/Redo performance.
+- **Automatic Image Optimization**: Screenshots pasted (`Ctrl+V`) or dropped are compressed to client-side WebP with an integrated fullscreen Lightbox viewer.
+- **Multi-Format Attachment Support**: Attach PDFs, Word (`.docx`), Excel (`.xlsx`), archives (`.zip`), audio, and text files up to 25 MB per file.
+- **Integrated Previews**: Built-in modal viewer for code, text, and PDF documents, plus native inline audio playback.
+
+### 6. Storage, Backups & Local Folder Vault
+- **Multi-Notebook Workspace**: Create, rename, switch, and delete multiple independent notebooks with isolated storage instances.
+- **Local Folder Vault (File System Access API)**: Connect a local directory on your disk to automatically mirror and synchronize your notes as plain `.md` files for direct interoperability with Obsidian and VS Code.
+- **7-Day Trash Recovery**: Deleted items are preserved in a notebook-specific recycle bin for 7 days before permanent purge, with recursive restore capabilities.
 - **Universal Export & Import**:
-  - **Markdown (`.md`)**: Full hierarchical markdown export and import, preserving attached sub-notes (`> note`) and multi-line blocks.
-  - **OPML 2.0 (`.opml`)**: Industry-standard outliner format for seamless migration to/from Workflowy, Dynalist, OmniOutliner, etc.
-  - **JSON Backup (`.json`)**: Download and restore full snapshot backups.
-  - **Safe Import Guard**: Choose between creating imported content as a brand-new notebook or replacing the active notebook.
-- **Pure Outliner Keyboard Navigation**: Seamlessly move between notes with `ArrowUp` and `ArrowDown` when at the boundaries of a note, without having to use the mouse.
-- **Mobile & Tablet Ergonomics**: Features a responsive slide-out drawer, touch swipe gestures (left/right) for indent/outdent, and a thumb-friendly bottom toolbar with virtual keyboard height compensation via `window.visualViewport`.
-- **Progressive Web App (PWA)**: Installable directly to the home screen or desktop on iOS, Android, macOS, and Windows with offline caching.
-- **Clean Print & PDF Export**: Press `Ctrl+P` for an ink-friendly print view that automatically hides sidebars, toolbars, and background colors.
+  - **Markdown (`.md`)**: Full hierarchical markdown with nested indentations and sub-notes (`> note`).
+  - **OPML 2.0 (`.opml`)**: Industry-standard outliner format for seamless migration with Workflowy, Dynalist, and OmniOutliner.
+  - **JSON (`.json`)**: Raw snapshot backups with safe import guards (import as new notebook or replace current).
+- **Single-Branch Export**: Download just the currently hoisted branch as a standalone `.md` file directly from the branch toolbar.
+- **Storage Quota Meter**: Real-time storage consumption meter in the sidebar displaying disk usage and remaining browser quota.
+
+### 7. Modern PWA & Multi-Tab Sync
+- **Progressive Web App (PWA)**: Installable on Windows, macOS, Linux, iOS, and Android with complete offline caching (`sw.js`).
+- **Web Share Target API**: Share text, links, and content directly from your operating system into ZenNotes.
+- **Native Cross-Tab Sync**: Edits made in one browser tab automatically update other open tabs in real-time via `BroadcastChannel` with zero network overhead.
 
 ---
 
@@ -66,109 +76,113 @@ All notes are stored directly on your device using IndexedDB with the Persistent
 | :--- | :--- |
 | **Enter** | Create a new sibling note directly below |
 | **Shift + Enter** | Insert a newline within the same note |
-| **Tab** | Indent note one level deeper (become child of previous sibling) |
-| **Shift + Tab** | Outdent note one level higher |
+| **Tab** | Indent note one level deeper (child of previous sibling) |
+| **Shift + Tab** | Outdent note one level outward |
 | **Backspace** *(on empty note)* | Outdents the note first, or deletes it if already at top level |
-| **Alt + Arrow Up** | Reorder current note position upward |
-| **Alt + Arrow Down** | Reorder current note position downward |
+| **Alt + Arrow Up** | Move current note upward |
+| **Alt + Arrow Down** | Move current note downward |
 | **Arrow Up** *(at start of note)* | Move focus to previous visible note |
 | **Arrow Down** *(at end of note)* | Move focus to next visible note |
-| **Ctrl + Enter** | Toggle task completion (strikethrough & checkmark) |
-| **Ctrl + V** | Paste clipboard screenshot or image directly into note or workspace |
-| **\`\`\`lang** or **\`code\`** | Code block with syntax highlighting and copy button |
-| **\[\[Note Title\]\]** | Bi-directional internal link to jump to or create another note |
+| **Ctrl + B** | Toggle bold formatting (`**bold**`) |
+| **Ctrl + I** | Toggle italic formatting (`*italic*`) |
+| **Ctrl + E** / **\`** | Toggle inline code (`` `code` ``) |
+| **Ctrl + T** / **Ctrl + Shift + S** | Toggle strikethrough (`~~strike~~`) |
+| **Ctrl + K** *(inside note)* | Insert markdown link `[text](url)` |
+| **Ctrl + V** | Paste clipboard screenshot or image directly into note |
+| **Escape** | Exit note editing mode to view formatted rendered text |
+| **Click Bullet** | Zoom in (hoist) into branch |
 
 ### Global Shortcuts
 
 | Shortcut | Description |
 | :--- | :--- |
-| **Ctrl + K** | Open fast live search modal |
-| **Ctrl + Z** | Undo last edit or structural tree change |
-| **Ctrl + Y** / **Ctrl + Shift + Z** | Redo action |
-| **Ctrl + Shift + C** | Collapse all sub-branches (tidy up tree) |
+| **Ctrl + K** | Open global quick search modal |
+| **Ctrl + Z** | Undo last text edit or tree restructuring |
+| **Ctrl + Y** / **Ctrl + Shift + Z** | Redo last action |
+| **Ctrl + Shift + C** | Collapse all sub-branches |
 | **Ctrl + Shift + E** | Expand all sub-branches |
-| **Ctrl + P** | Open print-optimized document view / PDF export |
-| **Escape** | Close open modals, search dropdowns, or active dialogs |
+| **Ctrl + P** | Open print-optimized view / PDF export |
+| **Escape** | Close active modals, search overlay, or dropdowns |
 
 ---
 
-## System Requirements
+## Technology Stack
 
-- **Node.js**: version 18 or later (LTS recommended).
-- **Package manager**: pnpm (recommended), npm, or yarn.
+- **Framework**: React 19 + TypeScript (Strict Mode)
+- **Styling**: Tailwind CSS v4
+- **Search Engine**: MiniSearch (Offline In-Memory Full-Text Index)
+- **Persistence**: IndexedDB (`idb-keyval`) + File System Access API
+- **Icons**: Lucide React
+- **Build Tool**: Vite 8 + Vitest + Oxlint
 
 ---
 
 ## Getting Started Locally
 
-1. Clone or navigate to the project repository:
+### Prerequisites
+- **Node.js**: v18 or later (LTS recommended)
+- **Package Manager**: `pnpm` (recommended), `npm`, or `yarn`
+
+### Installation & Run
+
+1. Clone or navigate into the workspace:
    ```bash
    cd mynotes
    ```
 
-2. Install project dependencies:
+2. Install dependencies:
    ```bash
    pnpm install
    ```
 
-3. Start the local development server:
+3. Launch development server:
    ```bash
    pnpm dev
    ```
-   Open the displayed URL (usually `http://localhost:5173`) in your browser.
+   Open `http://localhost:5173` in your browser.
 
-4. Run the automated test suite (Vitest):
+4. Run automated tests (Vitest):
    ```bash
    pnpm test
    ```
 
-5. Run code quality checks (oxlint):
+5. Run linter checks (Oxlint):
    ```bash
    pnpm run lint
    ```
 
-6. Build the optimized production bundle:
+6. Build optimized production bundle:
    ```bash
    pnpm run build
    ```
 
-7. Preview the production build locally:
+7. Preview production build locally:
    ```bash
    pnpm run preview
    ```
 
 ---
 
-## Deployment Guide
+## Deployment
 
-ZenNotes builds into a static Single Page Application (SPA) ready to deploy on any hosting provider.
+ZenNotes is a static Single Page Application (SPA) compatible with any static hosting platform.
 
-### 1. Vercel
-1. Import your Git repository into Vercel.
-2. Vercel automatically detects the Vite configuration:
-   - Framework Preset: `Vite`
-   - Build Command: `pnpm run build`
-   - Output Directory: `dist`
-3. The included `vercel.json` file handles all client-side URL rewrites automatically.
-4. Click **Deploy**.
+### Vercel
+1. Import repository into Vercel.
+2. Build Command: `pnpm run build`, Output Directory: `dist`.
+3. SPA routing is automatically handled via `vercel.json`.
 
-### 2. Netlify
-1. Select **Add new site** > **Import an existing project**.
-2. Build settings:
-   - Build command: `pnpm run build`
-   - Publish directory: `dist`
-3. The included `public/_redirects` file is copied to `dist` automatically to ensure SPA routes resolve correctly.
-4. Click **Deploy**.
+### Netlify
+1. Connect repository in Netlify dashboard.
+2. Build Command: `pnpm run build`, Publish Directory: `dist`.
+3. Fallback redirects are provided by `public/_redirects`.
 
-### 3. Cloudflare Pages
-1. Go to **Cloudflare Dashboard** > **Workers & Pages** > **Create application** > **Pages**.
-2. Connect your Git repository.
-3. Select framework preset: `Vite`.
-4. Set build command: `pnpm run build` and output directory: `dist`.
-5. Click **Save and Deploy**.
+### Cloudflare Pages
+1. Select **Pages** > **Create application** > **Connect to Git**.
+2. Build preset: `Vite`, Build Command: `pnpm run build`, Output Directory: `dist`.
 
-### 4. Self-Hosted Static Web Server (NGINX / Apache / Caddy)
-Run `pnpm run build` and upload the contents of the `dist/` directory to your web root. Configure your web server to redirect all requests to `index.html`.
+### Self-Hosted (NGINX / Caddy / Docker)
+Run `pnpm run build` and serve the static files in `dist/`. Ensure all route fallbacks redirect to `index.html`.
 
 ---
 
@@ -177,47 +191,50 @@ Run `pnpm run build` and upload the contents of the `dist/` directory to your we
 ```text
 mynotes/
 ├── public/
-│   ├── favicon.svg          # Vector application logo
-│   ├── icon-192.png         # PWA icon for Android and iOS
-│   ├── icon-512.png         # High-resolution PWA icon
-│   ├── manifest.json        # Web App Manifest metadata
+│   ├── favicon.svg          # Application icon
+│   ├── icon-192.png         # PWA icon (192px)
+│   ├── icon-512.png         # PWA icon (512px)
+│   ├── manifest.json        # Web App Manifest & Share Target configuration
 │   ├── robots.txt           # Search engine crawling rules
-│   ├── sitemap.xml          # Sitemap for SEO indexing
-│   ├── sw.js                # Service Worker for offline caching
-│   └── _redirects           # Fallback routing rules for Netlify and Cloudflare
+│   ├── sitemap.xml          # Sitemap for SEO
+│   ├── sw.js                # Service Worker for offline PWA caching
+│   └── _redirects           # SPA routing fallback for Netlify & Cloudflare
 ├── src/
 │   ├── components/
-│   │   ├── landing/         # Marketing landing page
-│   │   ├── layout/          # Top navigation bar
-│   │   ├── modals/          # Export/Import (Markdown, OPML, JSON), Trash, and Shortcuts modals
-│   │   ├── search/          # Live search component with keyboard navigation
-│   │   ├── sidebar/         # Notebook switcher and document tree map
-│   │   └── tree/            # Tree view, node items, code blocks, and mobile action toolbar
+│   │   ├── common/          # Error boundary and fallback handlers
+│   │   ├── graph/           # 2D interactive force-directed graph canvas
+│   │   ├── landing/         # Welcome & marketing landing page
+│   │   ├── layout/          # Navigation bar with action controls
+│   │   ├── modals/          # Modals (Vault, Trash, Graph, Shortcuts, Export/Import, Lightbox)
+│   │   ├── search/          # MiniSearch live modal with keyword highlighting
+│   │   ├── sidebar/         # Notebook switcher, tree overview, and storage meter
+│   │   ├── tree/            # Virtualized tree view, node items, code blocks, attachments
+│   │   └── ui/              # Toast notifications
 │   ├── core/
-│   │   ├── models/          # TreeDocument, TreeNode, and TrashItem models (+ Vitest tests)
-│   │   └── services/        # IndexedDB, TrashStorage, and Export/Import services (+ Vitest tests)
-│   ├── hooks/               # React custom hooks for state, history, notebooks, and theme
-│   ├── lib/                 # Lightweight syntax highlighter and styling utilities
-│   ├── App.tsx              # Root application component
+│   │   ├── models/          # TreeDocument, TreeNode, and TrashItem models (+ unit tests)
+│   │   └── services/        # IndexedDB, BlobStorage, LocalVault, SearchIndex, Graph (+ unit tests)
+│   ├── hooks/               # React hooks (history, virtual list, notebooks, vault, keyboard)
+│   ├── lib/                 # Attachment, formatting, image compression, and syntax utilities
+│   ├── App.tsx              # Root container with code-split lazy modals
 │   ├── index.css            # Tailwind CSS and print stylesheet
-│   └── main.tsx             # Application entry and Service Worker registration
-├── package.json             # Dependencies, scripts, and Vitest configuration
+│   └── main.tsx             # Application bootstrap & Service Worker registration
+├── package.json             # Project dependencies and script commands
 ├── tsconfig.json            # TypeScript configuration
-├── vercel.json              # Vercel SPA rewrite configuration
-└── vite.config.ts           # Vite configuration
+├── vercel.json              # Vercel deployment configuration
+└── vite.config.ts           # Vite bundler configuration
 ```
 
 ---
 
-## Data Privacy & Offline Resilience
+## Data Privacy & Local Sovereignty
 
-- All documents and trash history remain exclusively inside your browser's IndexedDB storage.
-- No analytics, tracking scripts, or external telemetry are embedded.
-- Data retention is reinforced with the Persistent Storage API to prevent browser storage eviction.
-- Download JSON or OPML backups periodically using the **Export / Import** menu for long-term peace of mind.
+- **Zero Cloud Leakage**: All notes, attachments, and recycle bin history remain exclusively on your device in IndexedDB.
+- **No Telemetry**: No third-party trackers, analytics, or third-party cookies are used.
+- **Durable Local Storage**: Browser storage persistence requests prevent unexpected data eviction.
+- **Open Formats**: You own your data. Export at any time to standard Markdown (`.md`), OPML 2.0, or JSON.
 
 ---
 
 ## License
 
-This project is open-source and free to use for personal and commercial note-taking workflows under the MIT License.
+This project is open-source and free to use under the [MIT License](LICENSE).

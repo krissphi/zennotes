@@ -7,7 +7,7 @@ import {
   Unlink,
   X,
 } from "lucide-react";
-import React from "react";
+import React, { useEffect } from "react";
 
 interface LocalVaultModalProps {
   isOpen: boolean;
@@ -38,6 +38,18 @@ export const LocalVaultModal: React.FC<LocalVaultModalProps> = ({
   onSyncNow,
   onToggleAutoSync,
 }) => {
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (

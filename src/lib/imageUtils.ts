@@ -1,4 +1,5 @@
 import { BlobStorageService } from '../core/services/BlobStorageService'
+import { computeBlobHash } from './attachmentUtils'
 
 export interface ProcessedImage {
   dataUrl: string
@@ -31,7 +32,7 @@ export async function processImageFile(
     ? (file as File).name.replace(/\.[^/.]+$/, '').trim() || 'image'
     : 'image'
 
-  const id = `blob_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`
+  const id = await computeBlobHash(file)
 
   if (typeof FileReader === 'undefined' && typeof (file as Blob).text === 'function') {
     const text = await (file as Blob).text()
@@ -131,9 +132,10 @@ export async function processImageFile(
         }
 
         const finalBlob = await canvasToBlob(canvas, quality)
+        const finalId = await computeBlobHash(finalBlob || file)
 
         await BlobStorageService.saveBlob({
-          id,
+          id: finalId,
           name: fileName,
           mimeType: finalBlob ? finalBlob.type : 'image/webp',
           sizeBytes: finalBlob ? finalBlob.size : outputDataUrl.length,
@@ -141,7 +143,7 @@ export async function processImageFile(
           dataUrl: outputDataUrl,
         })
 
-        const blobRef = `zenblob:${id}`
+        const blobRef = `zenblob:${finalId}`
         resolve({
           dataUrl: blobRef,
           name: fileName,

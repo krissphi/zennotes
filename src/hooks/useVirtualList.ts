@@ -5,6 +5,7 @@ interface UseVirtualListOptions {
   estimateHeight?: number
   overscan?: number
   scrollContainerSelector?: string
+  resetKey?: unknown
 }
 
 export interface VirtualRow {
@@ -22,12 +23,20 @@ export function useVirtualList({
   estimateHeight = 38,
   overscan = 8,
   scrollContainerSelector = '.overflow-y-auto',
+  resetKey,
 }: UseVirtualListOptions) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [scrollTop, setScrollTop] = useState(0)
   const [viewportHeight, setViewportHeight] = useState(800)
   const [offsetTop, setOffsetTop] = useState(0)
+  const [prevResetKey, setPrevResetKey] = useState(resetKey)
   const [measuredHeights, setMeasuredHeights] = useState<Map<number, number>>(() => new Map())
+
+  // Reset measurements when resetKey changes (e.g. branch navigation)
+  if (prevResetKey !== resetKey) {
+    setPrevResetKey(resetKey)
+    setMeasuredHeights(new Map())
+  }
 
   const roRef = useRef<ResizeObserver | null>(null)
 

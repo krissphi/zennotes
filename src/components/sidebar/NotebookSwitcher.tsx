@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { BookMarked, ChevronDown, Plus, Trash2, Edit2, Check, X } from 'lucide-react'
+import { ChevronDown, Plus, Trash2, Edit2, Check, X } from 'lucide-react'
 import type { NotebookMeta } from '../../core/services/NotebookRegistryService'
 
 interface NotebookSwitcherProps {
@@ -61,8 +61,8 @@ export const NotebookSwitcher: React.FC<NotebookSwitcherProps> = ({
     setEditTitle(nb.title)
   }
 
-  const handleConfirmRename = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation()
+  const handleConfirmRename = (id: string, e?: React.SyntheticEvent) => {
+    e?.stopPropagation()
     if (editTitle.trim()) {
       onRenameNotebook(id, editTitle.trim())
       setEditingId(null)
@@ -77,7 +77,6 @@ export const NotebookSwitcher: React.FC<NotebookSwitcherProps> = ({
         className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-white dark:bg-zinc-900 border border-[#E2E8F0] dark:border-[#27272A] hover:border-emerald-500/40 text-xs font-semibold text-[#0F172A] dark:text-[#F8FAFC] transition-colors shadow-2xs"
       >
         <div className="flex items-center gap-2 truncate">
-          <BookMarked className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
           <span className="truncate">{activeNotebook?.title || 'Notebook'}</span>
         </div>
         <ChevronDown className={`w-3.5 h-3.5 text-[#64748B] transition-transform ${isOpen ? 'rotate-180' : ''}`} />
@@ -100,7 +99,10 @@ export const NotebookSwitcher: React.FC<NotebookSwitcherProps> = ({
                       onChange={(e) => setEditTitle(e.target.value)}
                       autoFocus
                       className="flex-1 px-2 py-1 text-xs bg-slate-100 dark:bg-zinc-800 rounded outline-none border border-emerald-500 text-[#0F172A] dark:text-white"
-                      onKeyDown={(e) => e.key === 'Enter' && handleConfirmRename(nb.id, e as unknown as React.MouseEvent)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleConfirmRename(nb.id, e)
+                        if (e.key === 'Escape') setEditingId(null)
+                      }}
                     />
                     <button onClick={(e) => handleConfirmRename(nb.id, e)} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded">
                       <Check className="w-3 h-3" />
@@ -194,7 +196,10 @@ export const NotebookSwitcher: React.FC<NotebookSwitcherProps> = ({
                   onChange={(e) => setNewTitle(e.target.value)}
                   autoFocus
                   className="flex-1 px-2 py-1 text-xs bg-white dark:bg-zinc-800 rounded outline-none border border-emerald-500 text-[#0F172A] dark:text-white"
-                  onKeyDown={(e) => e.key === 'Enter' && handleConfirmCreate()}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleConfirmCreate()
+                    if (e.key === 'Escape') setIsCreating(false)
+                  }}
                 />
                 <button
                   onClick={handleConfirmCreate}

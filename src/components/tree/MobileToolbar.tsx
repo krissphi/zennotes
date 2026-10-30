@@ -6,7 +6,6 @@ import {
   ArrowDown,
   CornerDownLeft,
   Plus,
-  Check,
   Trash2,
   X,
   Undo2,
@@ -30,7 +29,6 @@ interface MobileToolbarProps {
   onMoveDown: (id: string) => void
   onAddChild: (id: string) => void
   onAddSibling: (id: string) => void
-  onToggleComplete: (id: string) => void
   onDelete: (id: string) => void
   onClose: () => void
 }
@@ -50,7 +48,6 @@ export const MobileToolbar: React.FC<MobileToolbarProps> = ({
   onMoveDown,
   onAddChild,
   onAddSibling,
-  onToggleComplete,
   onDelete,
   onClose,
 }) => {
@@ -85,17 +82,19 @@ export const MobileToolbar: React.FC<MobileToolbarProps> = ({
       >
         <div className="flex items-center justify-between max-w-md mx-auto gap-0.5">
           <button
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => onOutdent(activeNodeId)}
             title="Outdent"
-            className="p-2 rounded-lg text-[#64748B] dark:text-[#94A3B8] active:bg-slate-200 dark:active:bg-zinc-700 active:scale-90 transition-all"
+            className="p-2 rounded-lg text-[#64748B] dark:text-[#94A3B8] active:bg-slate-200 dark:active:bg-zinc-700 active:scale-90 transition-all cursor-pointer"
           >
             <IndentDecrease className="w-4 h-4" />
           </button>
 
           <button
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => onIndent(activeNodeId)}
             title="Indent"
-            className="p-2 rounded-lg text-[#64748B] dark:text-[#94A3B8] active:bg-slate-200 dark:active:bg-zinc-700 active:scale-90 transition-all"
+            className="p-2 rounded-lg text-[#64748B] dark:text-[#94A3B8] active:bg-slate-200 dark:active:bg-zinc-700 active:scale-90 transition-all cursor-pointer"
           >
             <IndentIncrease className="w-4 h-4" />
           </button>
@@ -103,17 +102,19 @@ export const MobileToolbar: React.FC<MobileToolbarProps> = ({
           <div className="h-4 w-[1px] bg-[#E2E8F0] dark:bg-[#27272A]" />
 
           <button
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => onMoveUp(activeNodeId)}
             title="Move up"
-            className="p-2 rounded-lg text-[#64748B] dark:text-[#94A3B8] active:bg-slate-200 dark:active:bg-zinc-700 active:scale-90 transition-all"
+            className="p-2 rounded-lg text-[#64748B] dark:text-[#94A3B8] active:bg-slate-200 dark:active:bg-zinc-700 active:scale-90 transition-all cursor-pointer"
           >
             <ArrowUp className="w-4 h-4" />
           </button>
 
           <button
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => onMoveDown(activeNodeId)}
             title="Move down"
-            className="p-2 rounded-lg text-[#64748B] dark:text-[#94A3B8] active:bg-slate-200 dark:active:bg-zinc-700 active:scale-90 transition-all"
+            className="p-2 rounded-lg text-[#64748B] dark:text-[#94A3B8] active:bg-slate-200 dark:active:bg-zinc-700 active:scale-90 transition-all cursor-pointer"
           >
             <ArrowDown className="w-4 h-4" />
           </button>
@@ -121,33 +122,28 @@ export const MobileToolbar: React.FC<MobileToolbarProps> = ({
           <div className="h-4 w-[1px] bg-[#E2E8F0] dark:bg-[#27272A]" />
 
           <button
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => onAddSibling(activeNodeId)}
             title="Add sibling item"
-            className="p-2 rounded-lg text-[#64748B] dark:text-[#94A3B8] active:bg-slate-200 dark:active:bg-zinc-700 active:scale-90 transition-all"
+            className="p-2 rounded-lg text-[#64748B] dark:text-[#94A3B8] active:bg-slate-200 dark:active:bg-zinc-700 active:scale-90 transition-all cursor-pointer"
           >
             <CornerDownLeft className="w-4 h-4" />
           </button>
 
           <button
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => onAddChild(activeNodeId)}
             title="Add sub-item"
-            className="p-2 rounded-lg text-[#64748B] dark:text-[#94A3B8] active:bg-slate-200 dark:active:bg-zinc-700 active:scale-90 transition-all"
+            className="p-2 rounded-lg text-[#64748B] dark:text-[#94A3B8] active:bg-slate-200 dark:active:bg-zinc-700 active:scale-90 transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" />
           </button>
 
           <button
-            onClick={() => onToggleComplete(activeNodeId)}
-            title="Toggle completion"
-            className="p-2 rounded-lg text-emerald-600 dark:text-emerald-400 active:bg-emerald-50 dark:active:bg-emerald-950/40 active:scale-90 transition-all"
-          >
-            <Check className="w-4 h-4" />
-          </button>
-
-          <button
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => onDelete(activeNodeId)}
             title="Delete item"
-            className="p-2 rounded-lg text-red-500 active:bg-red-50 dark:active:bg-red-950/40 active:scale-90 transition-all"
+            className="p-2 rounded-lg text-red-500 active:bg-red-50 dark:active:bg-red-950/40 active:scale-90 transition-all cursor-pointer"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -155,9 +151,10 @@ export const MobileToolbar: React.FC<MobileToolbarProps> = ({
           <div className="h-4 w-[1px] bg-[#E2E8F0] dark:bg-[#27272A]" />
 
           <button
+            onMouseDown={(e) => e.preventDefault()}
             onClick={onClose}
             title="Done"
-            className="p-2 rounded-lg text-[#64748B] dark:text-[#94A3B8] active:bg-slate-200 dark:active:bg-zinc-700 active:scale-90 transition-all font-medium"
+            className="p-2 rounded-lg text-[#64748B] dark:text-[#94A3B8] active:bg-slate-200 dark:active:bg-zinc-700 active:scale-90 transition-all font-medium cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>

@@ -6,7 +6,6 @@ import { NodeAttachment } from './NodeAttachment'
 
 interface FormattedNodeTextProps {
   content: string
-  isCompleted: boolean
   onActivate: () => void
   onNavigateToWikilink?: (title: string) => void
   onSelectTag?: (tag: string) => void
@@ -31,7 +30,6 @@ function getTagStyle(tag: string): string {
 
 export const FormattedNodeText: React.FC<FormattedNodeTextProps> = ({
   content,
-  isCompleted,
   onActivate,
   onNavigateToWikilink,
   onSelectTag,
@@ -83,9 +81,9 @@ export const FormattedNodeText: React.FC<FormattedNodeTextProps> = ({
     )
   }
 
-  // 2. Rich Text with Images, Attachments, URLs, Hashtags, Inline Code (`...`), and Wikilinks ([[...]])
+  // 2. Rich Text with Images, Attachments, Links, Bold, Strikethrough, Italic, URLs, Hashtags, Inline Code, and Wikilinks
   const regex =
-    /(!\[([^\]]*)\]\(([^)]+)\))|((?<!!)\[([^\]]+)\]\((data:[^)]+)\))|(https?:\/\/[^\s]+)|(#[a-zA-Z0-9_-]+)|(`[^`\n]+`)|(\[\[([^\]\n]+)\]\])/g
+    /(!\[([^\]]*)\]\(([^)]+)\))|((?<!!)\[([^\]]+)\]\(((?:data:|zenblob:)[^)]+)\))|((?<!!)\[([^\]]+)\]\((https?:\/\/[^)]+)\))|(\[\[([^\]\n]+)\]\])|(\*\*([^*\n]+)\*\*)|(~~([^~\n]+)~~)|(`([^`\n]+)`)|((?<!\*)\*([^*\s][^*\n]*?[^*\s]|\S)\*(?!\*))|(https?:\/\/[^\s]+)|(#[a-zA-Z0-9_-]+)/g
   const parts: React.ReactNode[] = []
   let lastIndex = 0
   let match: RegExpExecArray | null
@@ -105,13 +103,29 @@ export const FormattedNodeText: React.FC<FormattedNodeTextProps> = ({
         </div>
       )
     } else if (match[4]) {
-      // 2. File Attachment ([filename](data:...))
+      // 2. File Attachment ([filename](data:... or zenblob:...))
       const fileName = match[5]
       const dataUrl = match[6]
-      const base64 = dataUrl.split(',')[1] || ''
-      const sizeBytes = Math.floor((base64.length * 3) / 4)
-      const mimeMatch = dataUrl.match(/^data:([^;,]+)/)
-      const mimeType = mimeMatch ? mimeMatch[1] : 'application/octet-stream'
+      let mimeType = 'application/octet-stream'
+      let sizeBytes = 0
+
+      if (dataUrl.startsWith('zenblob:')) {
+        try {
+          const qIndex = dataUrl.indexOf('?')
+          if (qIndex !== -1) {
+            const params = new URLSearchParams(dataUrl.substring(qIndex + 1))
+            sizeBytes = parseInt(params.get('size') || '0', 10)
+            mimeType = params.get('type') || 'application/octet-stream'
+          }
+        } catch {
+          // Fallback
+        }
+      } else {
+        const mimeMatch = dataUrl.match(/^data:([^;,]+)/)
+        mimeType = mimeMatch ? mimeMatch[1] : 'application/octet-stream'
+        const base64 = dataUrl.split(',')[1] || ''
+        sizeBytes = Math.floor((base64.length * 3) / 4)
+      }
 
       parts.push(
         <div key={`att-${match.index}`} className="my-1" onClick={(e) => e.stopPropagation()}>
@@ -124,52 +138,24 @@ export const FormattedNodeText: React.FC<FormattedNodeTextProps> = ({
         </div>
       )
     } else if (match[7]) {
-      // 3. URL Linkify
-      const url = match[7]
+      // 3. Markdown Link [text](url)
+      const linkText = match[8]
+      const linkUrl = match[9]
       parts.push(
         <a
-          key={`url-${match.index}`}
-          href={url}
+          key={`mdlink-${match.index}`}
+          href={linkUrl}
           target="_blank"
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
-          className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 underline underline-offset-2 hover:text-emerald-700 dark:hover:text-emerald-300 mx-0.5"
+          className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 underline underline-offset-2 hover:text-emerald-700 dark:hover:text-emerald-300 mx-0.5 font-medium"
         >
-          <span>{url}</span>
+          <span>{linkText}</span>
           <ExternalLink className="w-3 h-3 shrink-0 inline opacity-70" />
         </a>
       )
-    } else if (match[8]) {
-      // 4. Tag Badge (Interactive click to filter / search)
-      const tag = match[8]
-      parts.push(
-        <button
-          type="button"
-          key={`tag-${match.index}`}
-          onClick={(e) => {
-            e.stopPropagation()
-            onSelectTag?.(tag)
-          }}
-          title={`Filter by tag "${tag}"`}
-          className={`inline-flex items-center gap-1 px-1.5 py-0.2 mx-0.5 text-xs rounded-md border text-[11px] leading-tight select-none shadow-3xs cursor-pointer hover:opacity-85 hover:scale-105 active:scale-95 transition-all ${getTagStyle(tag)}`}
-        >
-          <Tag className="w-2.5 h-2.5 opacity-60 shrink-0" />
-          <span>{tag}</span>
-        </button>
-      )
-    } else if (match[9]) {
-      // 5. Inline Code Snippet
-      const inlineCode = match[9].slice(1, -1)
-      parts.push(
-        <code
-          key={`code-${match.index}`}
-          className="inline-flex items-center px-1.5 py-0.5 mx-0.5 font-mono text-[12px] rounded-md bg-slate-100 dark:bg-zinc-800 text-emerald-600 dark:text-emerald-400 border border-slate-200/80 dark:border-zinc-700/80 font-medium select-text"
-        >
-          {inlineCode}
-        </code>
-      )
     } else if (match[10]) {
-      // 6. Wikilink / Internal Reference ([[Note Title]])
+      // 4. Wikilink / Internal Reference ([[Note Title]])
       const linkTarget = match[11]
       parts.push(
         <button
@@ -186,6 +172,75 @@ export const FormattedNodeText: React.FC<FormattedNodeTextProps> = ({
           <span>{linkTarget}</span>
         </button>
       )
+    } else if (match[12]) {
+      // 5. Bold (**bold**)
+      const boldText = match[13]
+      parts.push(
+        <strong key={`bold-${match.index}`} className="font-semibold text-[#0F172A] dark:text-[#F8FAFC]">
+          {boldText}
+        </strong>
+      )
+    } else if (match[14]) {
+      // 6. Strikethrough (~~strike~~)
+      const strikeText = match[15]
+      parts.push(
+        <del key={`strike-${match.index}`} className="line-through opacity-75">
+          {strikeText}
+        </del>
+      )
+    } else if (match[16]) {
+      // 7. Inline Code Snippet (`code`)
+      const inlineCode = match[17]
+      parts.push(
+        <code
+          key={`code-${match.index}`}
+          className="inline-flex items-center px-1.5 py-0.5 mx-0.5 font-mono text-[12px] rounded-md bg-slate-100 dark:bg-zinc-800 text-emerald-600 dark:text-emerald-400 border border-slate-200/80 dark:border-zinc-700/80 font-medium select-text"
+        >
+          {inlineCode}
+        </code>
+      )
+    } else if (match[18]) {
+      // 8. Italic (*italic*)
+      const italicText = match[19]
+      parts.push(
+        <em key={`italic-${match.index}`} className="italic">
+          {italicText}
+        </em>
+      )
+    } else if (match[20]) {
+      // 9. URL Linkify
+      const url = match[20]
+      parts.push(
+        <a
+          key={`url-${match.index}`}
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 underline underline-offset-2 hover:text-emerald-700 dark:hover:text-emerald-300 mx-0.5"
+        >
+          <span>{url}</span>
+          <ExternalLink className="w-3 h-3 shrink-0 inline opacity-70" />
+        </a>
+      )
+    } else if (match[21]) {
+      // 10. Tag Badge (Interactive click to filter / search)
+      const tag = match[21]
+      parts.push(
+        <button
+          type="button"
+          key={`tag-${match.index}`}
+          onClick={(e) => {
+            e.stopPropagation()
+            onSelectTag?.(tag)
+          }}
+          title={`Filter by tag "${tag}"`}
+          className={`inline-flex items-center gap-1 px-1.5 py-0.2 mx-0.5 text-xs rounded-md border text-[11px] leading-tight select-none shadow-3xs cursor-pointer hover:opacity-85 hover:scale-105 active:scale-95 transition-all ${getTagStyle(tag)}`}
+        >
+          <Tag className="w-2.5 h-2.5 opacity-60 shrink-0" />
+          <span>{tag}</span>
+        </button>
+      )
     }
 
     lastIndex = regex.lastIndex
@@ -198,11 +253,7 @@ export const FormattedNodeText: React.FC<FormattedNodeTextProps> = ({
   return (
     <div
       onClick={onActivate}
-      className={`w-full text-sm leading-relaxed break-words cursor-text min-h-[24px] py-0.5 select-text ${
-        isCompleted
-          ? 'line-through text-[#64748B]/70 dark:text-[#94A3B8]/60'
-          : 'text-[#0F172A] dark:text-[#F8FAFC]'
-      }`}
+      className="w-full text-sm leading-relaxed break-words cursor-text min-h-[24px] py-0.5 select-text text-[#0F172A] dark:text-[#F8FAFC]"
     >
       {parts}
     </div>
